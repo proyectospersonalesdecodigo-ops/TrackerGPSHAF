@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HAF Monitor Pro - Acceso Restringido</title>
+    <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-database-compat.js"></script>
+    
+    <style>
+        body { margin: 0; background: #000; color: #0f0; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100%; }
+        
+        /* PANTALLA DE LOGIN */
+        #login-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 9999; display: flex;
+            justify-content: center; align-items: center; flex-direction: column;
+        }
+        .login-box {
+            background: rgba(0, 20, 0, 0.9); padding: 30px;
+            border: 2px solid #0f0; border-radius: 15px;
+            box-shadow: 0 0 20px #0f0; text-align: center; width: 280px;
+        }
+        .login-box h2 { margin-bottom: 20px; text-shadow: 0 0 5px #0f0; }
+        .login-box input {
+            width: 100%; padding: 12px; margin: 10px 0;
+            background: #111; border: 1px solid #0f0; color: #fff;
+            border-radius: 5px; box-sizing: border-box; outline: none;
+        }
+        .btn-login {
+            width: 100%; padding: 12px; background: #0f0; color: #000;
+            border: none; border-radius: 5px; font-weight: bold;
+            cursor: pointer; text-transform: uppercase; margin-top: 10px;
+        }
+
+        /* CONTENIDO PRINCIPAL (OCULTO AL INICIO) */
+        #main-content { display: none; }
+
+        #map { height: 100vh; height: 100dvh; width: 100%; position: absolute; }
+        
+        #panel { 
+            position: fixed; top: 15px; left: 15px; z-index: 1000; 
+            background: rgba(0, 0, 0, 0.9); padding: 20px; 
+            border: 1px solid #0f0; border-radius: 12px; 
+            width: 280px; max-height: 90vh; overflow-y: auto;
+            box-shadow: 0 4px 15px rgba(0, 255, 0, 0.4);
+        }
+
+        @media (max-width: 600px) {
+            #panel {
+                top: auto; bottom: 0; left: 0; width: 100%; 
+                max-height: 45vh; border-radius: 20px 20px 0 0;
+                padding: 15px; border: none; box-sizing: border-box;
+            }
+            #lista-dispositivos { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 10px; }
+            .dispositivo-card { min-width: 180px; margin-bottom: 0 !important; flex-shrink: 0; }
+        }
+
+        .dispositivo-card {
+            background: #111; border: 1px solid #333;
+            padding: 12px; margin-bottom: 10px; border-radius: 8px;
+            font-size: 13px; cursor: pointer; transition: 0.3s;
+        }
+        .dispositivo-card.selected { border-left: 5px solid #0f0; background: #222; border-color: #0f0; }
+        
+        h3 { margin: 0 0 15px 0; text-align: center; color: #0f0; text-shadow: 0 0 5px #0f0; font-size: 18px; }
+        input[type="date"] { width: 100%; background: #222; color: #fff; border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; margin-top: 5px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; text-transform: uppercase; }
+        .btn-historial { background: #0f0; color: #000; }
+        .btn-vivo { background: #333; color: #fff; margin-top: 10px; }
+
+        .triangulo-g7 { width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-bottom: 35px solid #1A73E8; filter: drop-shadow(0 0 4px white); }
+        .triangulo-v2 { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 22px solid #0f0; filter: drop-shadow(0 0 3px white); }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <div class="login-box">
+            <h2>HAF SECURITY</h2>
+            <input type="text" id="userInput" placeholder="USUARIO">
+            <input type="password" id="passInput" placeholder="CONTRASEÑA">
+            <button class="btn-login" onclick="checkLogin()">ACCEDER</button>
+            <p id="errorMsg" style="color: red; font-size: 12px; margin-top: 10px; display: none;">DATOS INCORRECTOS</p>
+        </div>
+    </div>
+
+    <div id="main-content">
+        <div id="panel">
+            <h3>MONITOR HAF</h3>
+            <div id="lista-dispositivos">Esperando señal...</div>
+            <div id="seccion-historial" style="display:none; border-top: 1px solid #333; margin-top: 15px; padding-top: 10px;">
+                <small style="color:#888">HISTORIAL DE: <b id="nombre-sel" style="color:#0f0"></b></small>
+                <input type="date" id="inputFecha">
+                <button class="btn-historial" onclick="verHistorial()">Consultar Historial</button>
+                <button class="btn-vivo" onclick="location.reload()">Regresar al Vivo</button>
+            </div>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <script>
+        // LÓGICA DE LOGIN
+        function checkLogin() {
+            const user = document.getElementById("userInput").value;
+            const pass = document.getElementById("passInput").value;
+            
+            if (user === "HAF" && pass === "189600") {
+                document.getElementById("login-screen").style.display = "none";
+                document.getElementById("main-content").style.display = "block";
+                initMap(); // Cargamos el mapa solo después del login
+            } else {
+                document.getElementById("errorMsg").style.display = "block";
+            }
+        }
+
+        const _0xHAF = atob("QUl6YVN5RFV4b19VbDY1VVlMTklrbEt0UmhaX1VuVVM5a29BUjBZ");
+        const firebaseConfig = { databaseURL: "https://tracker-rastreador-haf-default-rtdb.firebaseio.com/" };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let map, infoWindow;
+        let markers = {}; 
+        let deviceData = {};
+        let dispositivoSeleccionado = null;
+        let polylineHistorial = null;
+        let zIndexGlobal = 1000;
+
+        (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?(console.warn(p+" only loads once. Re-queueing:",g),d[l](f,...n)):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({ key: _0xHAF, v: "weekly" });
+
+        async function initMap() {
+            const { Map, InfoWindow } = await google.maps.importLibrary("maps");
+            const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+
+            map = new Map(document.getElementById("map"), {
+                zoom: 14, center: {lat: -32.889, lng: -68.845}, mapId: "4504f8b37365c3d0",
+                disableDefaultUI: true, zoomControl: true
+            });
+            infoWindow = new InfoWindow();
+
+            database.ref("dispositivos").on('value', (snapshot) => {
+                const listaDiv = document.getElementById("lista-dispositivos");
+                listaDiv.innerHTML = ""; 
+
+                snapshot.forEach((childSnapshot) => {
+                    const id = childSnapshot.key;
+                    const data = childSnapshot.val().actual;
+                    if (!data) return;
+                    
+                    deviceData[id] = data;
+                    const pos = { lat: parseFloat(data.latitud), lng: parseFloat(data.longitud) };
+
+                    if (!markers[id]) {
+                        const icon = document.createElement("div");
+                        icon.className = (id === "MOTOG7" || id === "motorola_1") ? "triangulo-g7" : "triangulo-v2";
+                        
+                        markers[id] = new AdvancedMarkerElement({ 
+                            map: map, position: pos, content: icon, title: id, zIndex: 1 
+                        });
+                        markers[id].addListener("click", () => abrirInfo(id));
+                    } else {
+                        markers[id].position = pos;
+                    }
+
+                    listaDiv.innerHTML += `
+                        <div id="card-${id}" class="dispositivo-card ${dispositivoSeleccionado === id ? 'selected' : ''}" onclick="seleccionar('${id}')">
+                            <b style="color:#0f0">${id}</b><br>
+                            🔋 ${data.bateria || "N/A"} | ⏰ ${data.hora || "--:--"}
+                        </div>`;
+                });
+            });
+        }
+
+        function abrirInfo(id) {
+            const data = deviceData[id];
+            const content = `<div style="color:#333; padding:10px; font-family:Arial; font-size:13px;">
+                <b style="color:#1A73E8; font-size:15px;">🛰️ DISPOSITIVO: ${id}</b><hr>
+                <b>🔋 Batería:</b> ${data.bateria || 'N/A'}<br>
+                <b>📶 Señal:</b> ${data.senal || 'N/A'}<br>
+                <b>⏰ Reporte:</b> ${data.hora || '--:--'}
+            </div>`;
+            infoWindow.setContent(content);
+            infoWindow.open(map, markers[id]);
+            zIndexGlobal++;
+            markers[id].zIndex = zIndexGlobal;
+        }
+
+        function seleccionar(id) {
+            dispositivoSeleccionado = id;
+            document.getElementById("nombre-sel").innerText = id;
+            document.getElementById("seccion-historial").style.display = "block";
+            map.panTo(markers[id].position);
+            map.setZoom(18);
+            abrirInfo(id);
+        }
+
+        async function verHistorial() {
+            const fecha = document.getElementById("inputFecha").value;
+            if(!fecha || !dispositivoSeleccionado) return alert("Seleccioná una fecha");
+            if(polylineHistorial) polylineHistorial.setMap(null);
+            
+            database.ref(`dispositivos/${dispositivoSeleccionado}/historial/${fecha}`).once('value', snap => {
+                if(!snap.exists()) return alert("Sin datos de historial");
+                let puntos = [];
+                snap.forEach(h => { 
+                    const p = h.val(); 
+                    if(p.latitud && p.longitud) puntos.push({lat: parseFloat(p.latitud), lng: parseFloat(p.longitud)}); 
+                });
+                if(puntos.length > 0) {
+                    polylineHistorial = new google.maps.Polyline({ path: puntos, map: map, strokeColor: '#F00', strokeWeight: 5 });
+                    const bounds = new google.maps.LatLngBounds();
+                    puntos.forEach(p => bounds.extend(p));
+                    map.fitBounds(bounds);
+                } else { alert("Día sin coordenadas válidas"); }
+            });
+        }
+    </script>
+</body>
+</html>
