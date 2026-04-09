@@ -17,7 +17,7 @@
             justify-content: center; align-items: center; flex-direction: column;
         }
         .login-box {
-            background: rgba(0, 20, 0, 0.9); padding: 30px;
+            background: rgba(0, 20, 0, 0.92); padding: 30px;
             border: 2px solid #0f0; border-radius: 15px;
             box-shadow: 0 0 20px #0f0; text-align: center; width: 280px;
         }
@@ -35,7 +35,6 @@
 
         /* CONTENIDO PRINCIPAL */
         #main-content { display: none; }
-
         #map { height: 100vh; height: 100dvh; width: 100%; position: absolute; }
         
         #panel { 
@@ -47,7 +46,6 @@
             transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* MANIJA PARA MINIMIZAR (Visible en móviles) */
         .handle {
             width: 50px; height: 6px; background: #0f0; border-radius: 3px;
             margin: -5px auto 15px auto; cursor: pointer; display: none;
@@ -62,7 +60,6 @@
                 box-sizing: border-box;
             }
             .handle { display: block; }
-            /* Desplazamos el panel hacia abajo pero dejamos la manija visible */
             #panel.minimized { transform: translateY(calc(100% - 40px)); }
             #lista-dispositivos { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 10px; }
             .dispositivo-card { min-width: 180px; margin-bottom: 0 !important; flex-shrink: 0; }
@@ -127,8 +124,7 @@
         }
 
         function togglePanel() {
-            const panel = document.getElementById("panel");
-            panel.classList.toggle("minimized");
+            document.getElementById("panel").classList.toggle("minimized");
         }
 
         const _0xHAF = atob("QUl6YVN5RFV4b19VbDY1VVlMTklrbEt0UmhaX1VuVVM5a29BUjBZ");
@@ -141,6 +137,7 @@
         let deviceData = {};
         let dispositivoSeleccionado = null;
         let polylineHistorial = null;
+        let historialRef = null; 
         let zIndexGlobal = 1000;
 
         (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?(console.warn(p+" only loads once. Re-queueing:",g),d[l](f,...n)):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({ key: _0xHAF, v: "weekly" });
@@ -171,8 +168,22 @@
                     if (!markers[id]) {
                         const icon = document.createElement("div");
                         icon.className = (id === "MOTOG7") ? "triangulo-g7" : "triangulo-v2";
-                        markers[id] = new AdvancedMarkerElement({ map: map, position: pos, content: icon, title: id, zIndex: 1 });
-                        markers[id].addListener("click", () => abrirInfo(id));
+                        
+                        // Creación con gmp-clickable explícito
+                        markers[id] = new AdvancedMarkerElement({ 
+                            map: map, 
+                            position: pos, 
+                            content: icon, 
+                            title: id, 
+                            zIndex: 1,
+                            gmpClickable: true 
+                        });
+                        
+                        // CORRECCIÓN: Usar gmp-click con addEventListener
+                        markers[id].addEventListener("gmp-click", () => {
+                            abrirInfo(id);
+                        });
+
                     } else {
                         markers[id].position = pos;
                     }
@@ -215,27 +226,42 @@
         async function verHistorial() {
             const fecha = document.getElementById("inputFecha").value;
             if(!fecha || !dispositivoSeleccionado) return alert("Seleccioná una fecha");
-            if(polylineHistorial) polylineHistorial.setMap(null);
             
-            database.ref(`dispositivos/${dispositivoSeleccionado}/historial/${fecha}`).once('value', snap => {
-                if(!snap.exists()) return alert("Sin datos de historial para este día");
+            if(historialRef) historialRef.off();
+            if(polylineHistorial) polylineHistorial.setMap(null);
+
+            polylineHistorial = new google.maps.Polyline({
+                path: [], map: map, strokeColor: '#F00', strokeWeight: 5
+            });
+
+            historialRef = database.ref(`dispositivos/${dispositivoSeleccionado}/historial/${fecha}`);
+            
+            historialRef.on('value', snap => {
+                if(!snap.exists()) return console.log("Sin datos");
+                
                 let puntos = [];
                 snap.forEach(h => { 
                     const p = h.val(); 
-                    if(p.latitud && p.longitud) puntos.push({lat: parseFloat(p.latitud), lng: parseFloat(p.longitud)}); 
+                    if(p.latitud && p.longitud) {
+                        puntos.push({lat: parseFloat(p.latitud), lng: parseFloat(p.longitud)});
+                    }
                 });
+
                 if(puntos.length > 0) {
-                    polylineHistorial = new google.maps.Polyline({ path: puntos, map: map, strokeColor: '#F00', strokeWeight: 5 });
-                    const bounds = new google.maps.LatLngBounds();
-                    puntos.forEach(p => bounds.extend(p));
-                    map.fitBounds(bounds);
-                    // Minimizar para ver el recorrido
-                    togglePanel();
-                } else { alert("Día sin coordenadas válidas"); }
+                    polylineHistorial.setPath(puntos);
+                    if (puntos.length === 1 || !map.getBounds()) {
+                         const bounds = new google.maps.LatLngBounds();
+                         puntos.forEach(p => bounds.extend(p));
+                         map.fitBounds(bounds);
+                    }
+                }
             });
+
+            togglePanel();
         }
 
         function regresarAlVivo() {
+            if(historialRef) { historialRef.off(); historialRef = null; }
             document.getElementById("seccion-historial").style.display = "none";
             if (polylineHistorial) { polylineHistorial.setMap(null); polylineHistorial = null; }
             dispositivoSeleccionado = null;
