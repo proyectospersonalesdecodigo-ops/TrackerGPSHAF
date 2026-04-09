@@ -106,7 +106,7 @@
                 <small style="color:#888">HISTORIAL DE: <b id="nombre-sel" style="color:#0f0"></b></small>
                 <input type="date" id="inputFecha">
                 <button class="btn-historial" onclick="verHistorial()">Consultar Historial</button>
-                <button class="btn-vivo" onclick="location.reload()">Regresar al Vivo</button>
+                <button class="btn-vivo" onclick="regresarAlVivo()">Regresar al Vivo</button>
             </div>
         </div>
         <div id="map"></div>
@@ -227,6 +227,28 @@
                     map.fitBounds(bounds);
                 } else { alert("Día sin coordenadas válidas"); }
             });
+        }
+
+        function regresarAlVivo() {
+            // Ocultar sección de historial
+            document.getElementById("seccion-historial").style.display = "none";
+            
+            // Limpiar polilínea del mapa
+            if (polylineHistorial) {
+                polylineHistorial.setMap(null);
+                polylineHistorial = null;
+            }
+            
+            // Quitar selección visual de las tarjetas
+            dispositivoSeleccionado = null;
+            const cards = document.querySelectorAll('.dispositivo-card');
+            cards.forEach(card => card.classList.remove('selected'));
+
+            // Cerrar infoWindow si está abierta
+            if (infoWindow) infoWindow.close();
+
+            // Resetear zoom del mapa
+            map.setZoom(14);
         }
     </script>
 </body>
