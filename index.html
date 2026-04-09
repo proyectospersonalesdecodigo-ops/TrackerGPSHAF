@@ -40,18 +40,30 @@
         
         #panel { 
             position: fixed; top: 15px; left: 15px; z-index: 1000; 
-            background: rgba(0, 0, 0, 0.9); padding: 20px; 
+            background: rgba(0, 0, 0, 0.92); padding: 20px; 
             border: 1px solid #0f0; border-radius: 12px; 
             width: 280px; max-height: 90vh; overflow-y: auto;
             box-shadow: 0 4px 15px rgba(0, 255, 0, 0.4);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* MANIJA PARA MINIMIZAR (Visible en móviles) */
+        .handle {
+            width: 50px; height: 6px; background: #0f0; border-radius: 3px;
+            margin: -5px auto 15px auto; cursor: pointer; display: none;
+            box-shadow: 0 0 8px #0f0;
         }
 
         @media (max-width: 600px) {
             #panel {
                 top: auto; bottom: 0; left: 0; width: 100%; 
-                max-height: 45vh; border-radius: 20px 20px 0 0;
-                padding: 15px; border: none; box-sizing: border-box;
+                max-height: 50vh; border-radius: 20px 20px 0 0;
+                padding: 15px; border: 1px solid #0f0; border-bottom: none;
+                box-sizing: border-box;
             }
+            .handle { display: block; }
+            /* Desplazamos el panel hacia abajo pero dejamos la manija visible */
+            #panel.minimized { transform: translateY(calc(100% - 40px)); }
             #lista-dispositivos { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 10px; }
             .dispositivo-card { min-width: 180px; margin-bottom: 0 !important; flex-shrink: 0; }
         }
@@ -64,26 +76,13 @@
         .dispositivo-card.selected { border-left: 5px solid #0f0; background: #222; border-color: #0f0; }
         
         h3 { margin: 0 0 15px 0; text-align: center; color: #0f0; text-shadow: 0 0 5px #0f0; font-size: 18px; }
-        input[type="date"] { width: 100%; background: #222; color: #fff; border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 6px; box-sizing: border-box; }
+        input[type="date"] { width: 100%; background: #222; color: #fff; border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 6px; box-sizing: border-box; outline: none; }
         button { width: 100%; padding: 12px; margin-top: 5px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; text-transform: uppercase; }
         .btn-historial { background: #0f0; color: #000; }
         .btn-vivo { background: #333; color: #fff; margin-top: 10px; }
 
-        /* ESTILOS DE TRIÁNGULOS DIFERENCIADOS */
-        .triangulo-g7 { 
-            width: 0; height: 0; 
-            border-left: 16px solid transparent; 
-            border-right: 16px solid transparent; 
-            border-bottom: 35px solid #1A73E8; /* AZUL Y GRANDE */
-            filter: drop-shadow(0 0 4px white); 
-        }
-        .triangulo-v2 { 
-            width: 0; height: 0; 
-            border-left: 10px solid transparent; 
-            border-right: 10px solid transparent; 
-            border-bottom: 22px solid #0f0; /* VERDE Y CHICO */
-            filter: drop-shadow(0 0 3px white); 
-        }
+        .triangulo-g7 { width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-bottom: 35px solid #1A73E8; filter: drop-shadow(0 0 4px white); }
+        .triangulo-v2 { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 22px solid #0f0; filter: drop-shadow(0 0 3px white); }
     </style>
 </head>
 <body>
@@ -100,8 +99,10 @@
 
     <div id="main-content">
         <div id="panel">
+            <div class="handle" onclick="togglePanel()"></div>
             <h3>MONITOR HAF</h3>
             <div id="lista-dispositivos">Esperando señal...</div>
+            
             <div id="seccion-historial" style="display:none; border-top: 1px solid #333; margin-top: 15px; padding-top: 10px;">
                 <small style="color:#888">HISTORIAL DE: <b id="nombre-sel" style="color:#0f0"></b></small>
                 <input type="date" id="inputFecha">
@@ -116,7 +117,6 @@
         function checkLogin() {
             const user = document.getElementById("userInput").value;
             const pass = document.getElementById("passInput").value;
-            
             if (user === "HAF" && pass === "189600") {
                 document.getElementById("login-screen").style.display = "none";
                 document.getElementById("main-content").style.display = "block";
@@ -124,6 +124,11 @@
             } else {
                 document.getElementById("errorMsg").style.display = "block";
             }
+        }
+
+        function togglePanel() {
+            const panel = document.getElementById("panel");
+            panel.classList.toggle("minimized");
         }
 
         const _0xHAF = atob("QUl6YVN5RFV4b19VbDY1VVlMTklrbEt0UmhaX1VuVVM5a29BUjBZ");
@@ -152,6 +157,7 @@
 
             database.ref("dispositivos").on('value', (snapshot) => {
                 const listaDiv = document.getElementById("lista-dispositivos");
+                if (!listaDiv) return;
                 listaDiv.innerHTML = ""; 
 
                 snapshot.forEach((childSnapshot) => {
@@ -164,13 +170,8 @@
 
                     if (!markers[id]) {
                         const icon = document.createElement("div");
-                        
-                        // LÓGICA DE DIFERENCIACIÓN: G7 Azul grande, motorola_1 Verde chico
                         icon.className = (id === "MOTOG7") ? "triangulo-g7" : "triangulo-v2";
-                        
-                        markers[id] = new AdvancedMarkerElement({ 
-                            map: map, position: pos, content: icon, title: id, zIndex: 1 
-                        });
+                        markers[id] = new AdvancedMarkerElement({ map: map, position: pos, content: icon, title: id, zIndex: 1 });
                         markers[id].addListener("click", () => abrirInfo(id));
                     } else {
                         markers[id].position = pos;
@@ -203,9 +204,12 @@
             dispositivoSeleccionado = id;
             document.getElementById("nombre-sel").innerText = id;
             document.getElementById("seccion-historial").style.display = "block";
-            map.panTo(markers[id].position);
-            map.setZoom(18);
-            abrirInfo(id);
+            document.getElementById("panel").classList.remove("minimized");
+            if(markers[id]) {
+                map.panTo(markers[id].position);
+                map.setZoom(17);
+                abrirInfo(id);
+            }
         }
 
         async function verHistorial() {
@@ -214,7 +218,7 @@
             if(polylineHistorial) polylineHistorial.setMap(null);
             
             database.ref(`dispositivos/${dispositivoSeleccionado}/historial/${fecha}`).once('value', snap => {
-                if(!snap.exists()) return alert("Sin datos de historial");
+                if(!snap.exists()) return alert("Sin datos de historial para este día");
                 let puntos = [];
                 snap.forEach(h => { 
                     const p = h.val(); 
@@ -225,30 +229,21 @@
                     const bounds = new google.maps.LatLngBounds();
                     puntos.forEach(p => bounds.extend(p));
                     map.fitBounds(bounds);
+                    // Minimizar para ver el recorrido
+                    togglePanel();
                 } else { alert("Día sin coordenadas válidas"); }
             });
         }
 
         function regresarAlVivo() {
-            // Ocultar sección de historial
             document.getElementById("seccion-historial").style.display = "none";
-            
-            // Limpiar polilínea del mapa
-            if (polylineHistorial) {
-                polylineHistorial.setMap(null);
-                polylineHistorial = null;
-            }
-            
-            // Quitar selección visual de las tarjetas
+            if (polylineHistorial) { polylineHistorial.setMap(null); polylineHistorial = null; }
             dispositivoSeleccionado = null;
             const cards = document.querySelectorAll('.dispositivo-card');
             cards.forEach(card => card.classList.remove('selected'));
-
-            // Cerrar infoWindow si está abierta
             if (infoWindow) infoWindow.close();
-
-            // Resetear zoom del mapa
             map.setZoom(14);
+            document.getElementById("panel").classList.remove("minimized");
         }
     </script>
 </body>
