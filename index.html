@@ -33,7 +33,7 @@
             cursor: pointer; text-transform: uppercase; margin-top: 10px;
         }
 
-        /* CONTENIDO PRINCIPAL (OCULTO AL INICIO) */
+        /* CONTENIDO PRINCIPAL */
         #main-content { display: none; }
 
         #map { height: 100vh; height: 100dvh; width: 100%; position: absolute; }
@@ -69,8 +69,21 @@
         .btn-historial { background: #0f0; color: #000; }
         .btn-vivo { background: #333; color: #fff; margin-top: 10px; }
 
-        .triangulo-g7 { width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-bottom: 35px solid #1A73E8; filter: drop-shadow(0 0 4px white); }
-        .triangulo-v2 { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 22px solid #0f0; filter: drop-shadow(0 0 3px white); }
+        /* ESTILOS DE TRIÁNGULOS DIFERENCIADOS */
+        .triangulo-g7 { 
+            width: 0; height: 0; 
+            border-left: 16px solid transparent; 
+            border-right: 16px solid transparent; 
+            border-bottom: 35px solid #1A73E8; /* AZUL Y GRANDE */
+            filter: drop-shadow(0 0 4px white); 
+        }
+        .triangulo-v2 { 
+            width: 0; height: 0; 
+            border-left: 10px solid transparent; 
+            border-right: 10px solid transparent; 
+            border-bottom: 22px solid #0f0; /* VERDE Y CHICO */
+            filter: drop-shadow(0 0 3px white); 
+        }
     </style>
 </head>
 <body>
@@ -100,7 +113,6 @@
     </div>
 
     <script>
-        // LÓGICA DE LOGIN
         function checkLogin() {
             const user = document.getElementById("userInput").value;
             const pass = document.getElementById("passInput").value;
@@ -108,7 +120,7 @@
             if (user === "HAF" && pass === "189600") {
                 document.getElementById("login-screen").style.display = "none";
                 document.getElementById("main-content").style.display = "block";
-                initMap(); // Cargamos el mapa solo después del login
+                initMap();
             } else {
                 document.getElementById("errorMsg").style.display = "block";
             }
@@ -152,7 +164,9 @@
 
                     if (!markers[id]) {
                         const icon = document.createElement("div");
-                        icon.className = (id === "MOTOG7" || id === "motorola_1") ? "triangulo-g7" : "triangulo-v2";
+                        
+                        // LÓGICA DE DIFERENCIACIÓN: G7 Azul grande, motorola_1 Verde chico
+                        icon.className = (id === "MOTOG7") ? "triangulo-g7" : "triangulo-v2";
                         
                         markers[id] = new AdvancedMarkerElement({ 
                             map: map, position: pos, content: icon, title: id, zIndex: 1 
