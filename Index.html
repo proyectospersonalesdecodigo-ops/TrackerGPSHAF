@@ -3,39 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HAF Monitor Pro - Acceso Restringido</title>
+    <title>HAF Monitor Pro - Multi-Flota</title>
     <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-database-compat.js"></script>
     
     <style>
         body { margin: 0; background: #000; color: #0f0; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100%; }
-        
-        /* PANTALLA DE LOGIN */
-        #login-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 9999; display: flex;
-            justify-content: center; align-items: center; flex-direction: column;
-        }
-        .login-box {
-            background: rgba(0, 20, 0, 0.9); padding: 30px;
-            border: 2px solid #0f0; border-radius: 15px;
-            box-shadow: 0 0 20px #0f0; text-align: center; width: 280px;
-        }
-        .login-box h2 { margin-bottom: 20px; text-shadow: 0 0 5px #0f0; }
-        .login-box input {
-            width: 100%; padding: 12px; margin: 10px 0;
-            background: #111; border: 1px solid #0f0; color: #fff;
-            border-radius: 5px; box-sizing: border-box; outline: none;
-        }
-        .btn-login {
-            width: 100%; padding: 12px; background: #0f0; color: #000;
-            border: none; border-radius: 5px; font-weight: bold;
-            cursor: pointer; text-transform: uppercase; margin-top: 10px;
-        }
-
-        /* CONTENIDO PRINCIPAL (OCULTO AL INICIO) */
-        #main-content { display: none; }
-
         #map { height: 100vh; height: 100dvh; width: 100%; position: absolute; }
         
         #panel { 
@@ -52,7 +25,9 @@
                 max-height: 45vh; border-radius: 20px 20px 0 0;
                 padding: 15px; border: none; box-sizing: border-box;
             }
-            #lista-dispositivos { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 10px; }
+            #lista-dispositivos {
+                display: flex; overflow-x: auto; gap: 10px; padding-bottom: 10px;
+            }
             .dispositivo-card { min-width: 180px; margin-bottom: 0 !important; flex-shrink: 0; }
         }
 
@@ -69,51 +44,35 @@
         .btn-historial { background: #0f0; color: #000; }
         .btn-vivo { background: #333; color: #fff; margin-top: 10px; }
 
-        .triangulo-g7 { width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-bottom: 35px solid #1A73E8; filter: drop-shadow(0 0 4px white); }
-        .triangulo-v2 { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 22px solid #0f0; filter: drop-shadow(0 0 3px white); }
+        .triangulo-g7 { 
+            width: 0; height: 0; 
+            border-left: 16px solid transparent; border-right: 16px solid transparent; 
+            border-bottom: 35px solid #1A73E8; 
+            filter: drop-shadow(0 0 4px white);
+        }
+        .triangulo-v2 { 
+            width: 0; height: 0; 
+            border-left: 10px solid transparent; border-right: 10px solid transparent; 
+            border-bottom: 22px solid #0f0; 
+            filter: drop-shadow(0 0 3px white);
+        }
     </style>
 </head>
 <body>
-
-    <div id="login-screen">
-        <div class="login-box">
-            <h2>HAF SECURITY</h2>
-            <input type="text" id="userInput" placeholder="USUARIO">
-            <input type="password" id="passInput" placeholder="CONTRASEÑA">
-            <button class="btn-login" onclick="checkLogin()">ACCEDER</button>
-            <p id="errorMsg" style="color: red; font-size: 12px; margin-top: 10px; display: none;">DATOS INCORRECTOS</p>
+    <div id="panel">
+        <h3>MONITOR HAF</h3>
+        <div id="lista-dispositivos">Esperando señal...</div>
+        
+        <div id="seccion-historial" style="display:none; border-top: 1px solid #333; margin-top: 15px; padding-top: 10px;">
+            <small style="color:#888">HISTORIAL DE: <b id="nombre-sel" style="color:#0f0"></b></small>
+            <input type="date" id="inputFecha">
+            <button class="btn-historial" onclick="verHistorial()">Consultar Historial</button>
+            <button class="btn-vivo" onclick="location.reload()">Regresar al Vivo</button>
         </div>
     </div>
-
-    <div id="main-content">
-        <div id="panel">
-            <h3>MONITOR HAF</h3>
-            <div id="lista-dispositivos">Esperando señal...</div>
-            <div id="seccion-historial" style="display:none; border-top: 1px solid #333; margin-top: 15px; padding-top: 10px;">
-                <small style="color:#888">HISTORIAL DE: <b id="nombre-sel" style="color:#0f0"></b></small>
-                <input type="date" id="inputFecha">
-                <button class="btn-historial" onclick="verHistorial()">Consultar Historial</button>
-                <button class="btn-vivo" onclick="location.reload()">Regresar al Vivo</button>
-            </div>
-        </div>
-        <div id="map"></div>
-    </div>
+    <div id="map"></div>
 
     <script>
-        // LÓGICA DE LOGIN
-        function checkLogin() {
-            const user = document.getElementById("userInput").value;
-            const pass = document.getElementById("passInput").value;
-            
-            if (user === "HAF" && pass === "189600") {
-                document.getElementById("login-screen").style.display = "none";
-                document.getElementById("main-content").style.display = "block";
-                initMap(); // Cargamos el mapa solo después del login
-            } else {
-                document.getElementById("errorMsg").style.display = "block";
-            }
-        }
-
         const _0xHAF = atob("QUl6YVN5RFV4b19VbDY1VVlMTklrbEt0UmhaX1VuVVM5a29BUjBZ");
         const firebaseConfig = { databaseURL: "https://tracker-rastreador-haf-default-rtdb.firebaseio.com/" };
         firebase.initializeApp(firebaseConfig);
@@ -152,6 +111,7 @@
 
                     if (!markers[id]) {
                         const icon = document.createElement("div");
+                        // CORRECCIÓN: Ahora detecta cualquiera de los dos nombres para el icono azul
                         icon.className = (id === "MOTOG7" || id === "motorola_1") ? "triangulo-g7" : "triangulo-v2";
                         
                         markers[id] = new AdvancedMarkerElement({ 
@@ -199,21 +159,29 @@
             if(!fecha || !dispositivoSeleccionado) return alert("Seleccioná una fecha");
             if(polylineHistorial) polylineHistorial.setMap(null);
             
+            // CORRECCIÓN: Ahora busca dinámicamente en la carpeta del dispositivo seleccionado
             database.ref(`dispositivos/${dispositivoSeleccionado}/historial/${fecha}`).once('value', snap => {
-                if(!snap.exists()) return alert("Sin datos de historial");
+                if(!snap.exists()) return alert("Sin datos de historial para este día");
                 let puntos = [];
                 snap.forEach(h => { 
                     const p = h.val(); 
-                    if(p.latitud && p.longitud) puntos.push({lat: parseFloat(p.latitud), lng: parseFloat(p.longitud)}); 
+                    if(p.latitud && p.longitud) {
+                        puntos.push({lat: parseFloat(p.latitud), lng: parseFloat(p.longitud)}); 
+                    }
                 });
                 if(puntos.length > 0) {
-                    polylineHistorial = new google.maps.Polyline({ path: puntos, map: map, strokeColor: '#F00', strokeWeight: 5 });
+                    polylineHistorial = new google.maps.Polyline({ 
+                        path: puntos, map: map, strokeColor: '#F00', strokeWeight: 5 
+                    });
                     const bounds = new google.maps.LatLngBounds();
                     puntos.forEach(p => bounds.extend(p));
                     map.fitBounds(bounds);
-                } else { alert("Día sin coordenadas válidas"); }
+                } else {
+                    alert("El historial existe pero los puntos no tienen coordenadas válidas.");
+                }
             });
         }
+        initMap();
     </script>
 </body>
 </html>
