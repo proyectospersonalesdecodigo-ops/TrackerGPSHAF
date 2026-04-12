@@ -77,9 +77,6 @@
         button { width: 100%; padding: 12px; margin-top: 5px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; text-transform: uppercase; }
         .btn-historial { background: #0f0; color: #000; }
         .btn-vivo { background: #333; color: #fff; margin-top: 10px; }
-
-        .triangulo-g7 { width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-bottom: 35px solid #1A73E8; filter: drop-shadow(0 0 4px white); }
-        .triangulo-v2 { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 22px solid #0f0; filter: drop-shadow(0 0 3px white); }
     </style>
 </head>
 <body>
@@ -129,7 +126,7 @@
 
         const _0xHAF = atob("QUl6YVN5RFV4b19VbDY1VVlMTklrbEt0UmhaX1VuVVM5a29BUjBZ");
         
-        // ¡REEMPLAZA LO DE ABAJO POR TU ENLACE NUEVO!
+        // ¡RECUERDA PEGAR TU ENLACE NUEVO!
         const firebaseConfig = { databaseURL: "https://tracker-rastreador-haf-default-rtdb.firebaseio.com/" };
         
         firebase.initializeApp(firebaseConfig);
@@ -141,7 +138,11 @@
         let dispositivoSeleccionado = null;
         let polylineHistorial = null;
         let historialRef = null; 
+        // Empezamos con una base alta para los z-index (así siempre están sobre el mapa básico)
         let zIndexGlobal = 1000;
+
+        // Paleta de colores fuertes (Rojo, Azul, Amarillo, Naranja, Marrón, Púrpura, Verde, Naranja rojizo)
+        const coloresFuertes = ["#D32F2F", "#1976D2", "#FBC02D", "#F57C00", "#795548", "#8E24AA", "#388E3C", "#E64A19"];
 
         (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?(console.warn(p+" only loads once. Re-queueing:",g),d[l](f,...n)):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({ key: _0xHAF, v: "weekly" });
 
@@ -160,6 +161,8 @@
                 if (!listaDiv) return;
                 listaDiv.innerHTML = ""; 
 
+                let indice = 0; // Usado para que los tamaños y colores cambien por cada vehículo
+
                 snapshot.forEach((childSnapshot) => {
                     const id = childSnapshot.key;
                     const data = childSnapshot.val().actual;
@@ -168,34 +171,55 @@
                     deviceData[id] = data;
                     const pos = { lat: parseFloat(data.latitud), lng: parseFloat(data.longitud) };
 
+                    // Determinamos el color usando el índice que va aumentando
+                    let colorLlamativo = coloresFuertes[indice % coloresFuertes.length];
+
                     if (!markers[id]) {
-                        const icon = document.createElement("div");
-                        icon.className = (id === "MOTOG7") ? "triangulo-g7" : "triangulo-v2";
                         
-                        // Creación con gmp-clickable explícito
+                        // --- FÓRMULA DE CRECIMIENTO CONSTANTE Y SUPERPOSICIÓN ---
+                        // Cada nuevo auto es ligeramente más alto y ancho.
+                        // Vehiculo 1: 32px, Vehiculo 2: 38px, Vehiculo 3: 44px...
+                        let altoTriangulo = 32 + (indice * 6); 
+                        let anchoMital = altoTriangulo / 2.2; 
+
+                        const icon = document.createElement("div");
+                        icon.style.width = "0";
+                        icon.style.height = "0";
+                        icon.style.borderLeft = `${anchoMital}px solid transparent`;
+                        icon.style.borderRight = `${anchoMital}px solid transparent`;
+                        icon.style.borderBottom = `${altoTriangulo}px solid ${colorLlamativo}`;
+                        // Sombra sutil oscura alrededor
+                        icon.style.filter = "drop-shadow(0 0 3px rgba(255,255,255,0.7))";
+                        
+                        // Para que el más chiquito no quede tapado por uno grande en la misma cuadra, le damos un z-index más alto al índice menor
+                        let zIndexFijo = zIndexGlobal - indice;
+
                         markers[id] = new AdvancedMarkerElement({ 
                             map: map, 
                             position: pos, 
                             content: icon, 
                             title: id, 
-                            zIndex: 1,
+                            zIndex: zIndexFijo,
                             gmpClickable: true 
                         });
                         
-                        // CORRECCIÓN: Usar gmp-click con addEventListener
                         markers[id].addEventListener("gmp-click", () => {
                             abrirInfo(id);
                         });
 
                     } else {
+                        // Si ya existe en el mapa, solo actualizamos coordenadas
                         markers[id].position = pos;
                     }
 
+                    // Botón en la lista
                     listaDiv.innerHTML += `
                         <div id="card-${id}" class="dispositivo-card ${dispositivoSeleccionado === id ? 'selected' : ''}" onclick="seleccionar('${id}')">
-                            <b style="color:#0f0">${id}</b><br>
+                            <b style="color:${colorLlamativo}; text-shadow: 0 0 2px #000;">${id}</b><br>
                             🔋 ${data.bateria || "N/A"} | ⏰ ${data.hora || "--:--"}
                         </div>`;
+
+                    indice++; // Pasamos al siguiente vehículo, lo que cambiará el tamaño y color
                 });
             });
         }
@@ -210,7 +234,9 @@
             </div>`;
             infoWindow.setContent(content);
             infoWindow.open(map, markers[id]);
-            zIndexGlobal++;
+            
+            // Para que este auto resalte sobre absolutamente todos cuando hacemos click
+            zIndexGlobal += 100;
             markers[id].zIndex = zIndexGlobal;
         }
 
