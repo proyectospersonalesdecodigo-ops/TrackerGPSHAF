@@ -77,9 +77,6 @@
         button { width: 100%; padding: 12px; margin-top: 5px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; text-transform: uppercase; }
         .btn-historial { background: #0f0; color: #000; }
         .btn-vivo { background: #333; color: #fff; margin-top: 10px; }
-
-        .triangulo-g7 { width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-bottom: 35px solid #1A73E8; filter: drop-shadow(0 0 4px white); }
-        .triangulo-v2 { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 22px solid #0f0; filter: drop-shadow(0 0 3px white); }
     </style>
 </head>
 <body>
@@ -140,13 +137,14 @@
         let historialRef = null; 
         let zIndexGlobal = 1000;
 
+        // PALETA DE COLORES OSCUROS
+        const paletaColores = ["#D32F2F", "#1976D2", "#FBC02D", "#5D4037", "#212121", "#455A64", "#388E3C", "#E64A19"];
+
         (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?(console.warn(p+" only loads once. Re-queueing:",g),d[l](f,...n)):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({ key: _0xHAF, v: "weekly" });
 
         async function initMap() {
             const { Map, InfoWindow } = await google.maps.importLibrary("maps");
             const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
-
-            console.log("Sistema de Mapas Inicializado");
 
             map = new Map(document.getElementById("map"), {
                 zoom: 14, center: {lat: -32.889, lng: -68.845}, mapId: "4504f8b37365c3d0",
@@ -159,73 +157,47 @@
                 if (!listaDiv) return;
                 listaDiv.innerHTML = ""; 
 
-                if (!snapshot || !snapshot.exists()) {
-                    console.warn("No hay datos en Firebase.");
-                    return;
-                }
+                let indice = 0;
 
-                console.log("--- ACTUALIZACIÓN DESDE FIREBASE ---");
-                
                 snapshot.forEach((childSnapshot) => {
                     const id = childSnapshot.key;
                     const fullVal = childSnapshot.val();
                     
-                    // --- PROTECCIÓN LÍNEA 149 ---
-                    if (!fullVal || !fullVal.actual) {
-                        console.warn(`Dispositivo ${id} ignorado: falta carpeta 'actual'.`);
-                        return;
-                    }
+                    if (!fullVal || !fullVal.actual) return;
 
                     const data = fullVal.actual;
                     deviceData[id] = data;
-                    
-                    const lat = parseFloat(data.latitud);
-                    const lng = parseFloat(data.longitud);
+                    const pos = { lat: parseFloat(data.latitud), lng: parseFloat(data.longitud) };
 
-                    if (isNaN(lat) || isNaN(lng)) {
-                        console.error(`Coordenadas inválidas para ${id}`);
-                        return;
-                    }
-
-                    const pos = { lat, lng };
+                    // ASIGNAMOS COLOR OSCURO DE LA LISTA
+                    let colorActual = paletaColores[indice % paletaColores.length];
 
                     if (!markers[id]) {
                         const icon = document.createElement("div");
-                        let idUpper = id.toUpperCase();
-                        
-                        // Diferenciación de triángulos
-                        if (idUpper.includes("G5") || idUpper.includes("G7") || idUpper.includes("MOTOG7")) {
-                            icon.className = "triangulo-g7";
-                        } else {
-                            icon.className = "triangulo-v2";
-                        }
+                        icon.style.width = "0"; icon.style.height = "0";
+                        icon.style.borderLeft = "14px solid transparent";
+                        icon.style.borderRight = "14px solid transparent";
+                        icon.style.borderBottom = `30px solid ${colorActual}`;
+                        icon.style.filter = "drop-shadow(0 0 3px white)";
                         
                         markers[id] = new AdvancedMarkerElement({ 
-                            map: map, 
-                            position: pos, 
-                            content: icon, 
-                            title: id, 
-                            zIndex: idUpper.includes("G7") ? 1001 : 1000,
-                            gmpClickable: true 
+                            map: map, position: pos, content: icon, title: id, 
+                            zIndex: 1000 + indice, gmpClickable: true 
                         });
-                        
                         markers[id].addEventListener("gmp-click", () => { abrirInfo(id); });
-
                     } else {
                         markers[id].position = pos;
                     }
 
                     const nombreLimpio = id.split("__")[0].replace(/_/g, " ");
-
                     listaDiv.innerHTML += `
                         <div id="card-${id}" class="dispositivo-card ${dispositivoSeleccionado === id ? 'selected' : ''}" onclick="seleccionar('${id}')">
-                            <b style="color:#0f0">${nombreLimpio}</b><br>
+                            <b style="color:${colorActual}">${nombreLimpio}</b><br>
                             🔋 ${data.bateria || "N/A"} | ⏰ ${data.hora || "--:--"}
                         </div>`;
+                    indice++;
                 });
-            }, (error) => {
-                console.error("Error de Firebase:", error);
-            });
+            }, (error) => { console.error("Error Firebase:", error); });
         }
 
         function abrirInfo(id) {
@@ -238,8 +210,7 @@
             </div>`;
             infoWindow.setContent(content);
             infoWindow.open(map, markers[id]);
-            zIndexGlobal++;
-            markers[id].zIndex = zIndexGlobal;
+            zIndexGlobal++; markers[id].zIndex = zIndexGlobal;
         }
 
         function seleccionar(id) {
@@ -259,21 +230,15 @@
             if(!fecha || !dispositivoSeleccionado) return alert("Seleccioná una fecha");
             if(historialRef) historialRef.off();
             if(polylineHistorial) polylineHistorial.setMap(null);
-            
             polylineHistorial = new google.maps.Polyline({ path: [], map: map, strokeColor: '#F00', strokeWeight: 5 });
             historialRef = database.ref(`dispositivos/${dispositivoSeleccionado}/historial/${fecha}`);
-            
             historialRef.on('value', snap => {
                 if(!snap.exists()) return alert("Sin datos");
-                
                 let puntos = [];
                 snap.forEach(h => { 
                     const p = h.val(); 
-                    if(p && p.latitud && p.longitud) {
-                        puntos.push({lat: parseFloat(p.latitud), lng: parseFloat(p.longitud)});
-                    }
+                    if(p && p.latitud && p.longitud) puntos.push({lat: parseFloat(p.latitud), lng: parseFloat(p.longitud)});
                 });
-                
                 if(puntos.length > 0) {
                     polylineHistorial.setPath(puntos);
                     const bounds = new google.maps.LatLngBounds();
