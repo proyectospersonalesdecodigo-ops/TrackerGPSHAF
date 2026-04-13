@@ -10,6 +10,7 @@
     <style>
         body { margin: 0; background: #000; color: #0f0; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100%; }
         
+        /* PANTALLA DE LOGIN */
         #login-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 9999; display: flex;
@@ -32,6 +33,7 @@
             cursor: pointer; text-transform: uppercase; margin-top: 10px;
         }
 
+        /* CONTENIDO PRINCIPAL */
         #main-content { display: none; }
         #map { height: 100vh; height: 100dvh; width: 100%; position: absolute; }
         
@@ -75,6 +77,10 @@
         button { width: 100%; padding: 12px; margin-top: 5px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; text-transform: uppercase; }
         .btn-historial { background: #0f0; color: #000; }
         .btn-vivo { background: #333; color: #fff; margin-top: 10px; }
+
+        /* ESTILOS DE TRIÁNGULOS */
+        .triangulo-g7 { width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-bottom: 35px solid #1A73E8; filter: drop-shadow(0 0 4px white); }
+        .triangulo-v2 { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 22px solid #0f0; filter: drop-shadow(0 0 3px white); }
     </style>
 </head>
 <body>
@@ -112,7 +118,7 @@
             if (user === "HAF" && pass === "189600") {
                 document.getElementById("login-screen").style.display = "none";
                 document.getElementById("main-content").style.display = "block";
-                initMap();
+                setTimeout(() => { initMap(); }, 150);
             } else {
                 document.getElementById("errorMsg").style.display = "block";
             }
@@ -124,7 +130,6 @@
 
         const _0xHAF = atob("QUl6YVN5RFV4b19VbDY1VVlMTklrbEt0UmhaX1VuVVM5a29BUjBZ");
         const firebaseConfig = { databaseURL: "https://tracker-rastreador-haf-default-rtdb.firebaseio.com/" };
-        
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
@@ -161,38 +166,38 @@
                     deviceData[id] = data;
                     const pos = { lat: parseFloat(data.latitud), lng: parseFloat(data.longitud) };
 
-                    // Lógica de colores por nombre (G5 o G7 = Azul Grande, otros = Verde Chico)
-                    let colorTriangulo = "#0f0"; 
-                    let altoT = 22;
-                    let anchoM = 10;
-                    if (id.toUpperCase().includes("G5") || id.toUpperCase().includes("G7")) {
-                        colorTriangulo = "#1A73E8"; 
-                        altoT = 35;
-                        anchoM = 16;
-                    }
-
                     if (!markers[id]) {
                         const icon = document.createElement("div");
-                        icon.style.width = "0"; icon.style.height = "0";
-                        icon.style.borderLeft = `${anchoM}px solid transparent`;
-                        icon.style.borderRight = `${anchoM}px solid transparent`;
-                        icon.style.borderBottom = `${altoT}px solid ${colorTriangulo}`;
-                        icon.style.filter = "drop-shadow(0 0 3px white)";
-
+                        
+                        // LÓGICA INTELIGENTE: Detecta G5 o G7 en el nombre automático
+                        let idUpper = id.toUpperCase();
+                        if (idUpper.includes("G5") || idUpper.includes("G7") || idUpper.includes("MOTOG7")) {
+                            icon.className = "triangulo-g7";
+                        } else {
+                            icon.className = "triangulo-v2";
+                        }
+                        
                         markers[id] = new AdvancedMarkerElement({ 
-                            map: map, position: pos, content: icon, title: id, 
-                            zIndex: (colorTriangulo === "#1A73E8" ? 1005 : 1000)
+                            map: map, 
+                            position: pos, 
+                            content: icon, 
+                            title: id, 
+                            zIndex: idUpper.includes("G7") ? 1001 : 1000,
+                            gmpClickable: true 
                         });
                         
-                        markers[id].addEventListener("gmp-click", () => abrirInfo(id));
+                        markers[id].addEventListener("gmp-click", () => { abrirInfo(id); });
+
                     } else {
                         markers[id].position = pos;
                     }
 
-                    const nombreVisible = id.length > 20 ? id.substring(0, 18) + "..." : id;
+                    // Limpiamos el nombre largo para que no rompa el diseño del panel
+                    const nombreLimpio = id.split("__")[0].replace(/_/g, " ");
+
                     listaDiv.innerHTML += `
                         <div id="card-${id}" class="dispositivo-card ${dispositivoSeleccionado === id ? 'selected' : ''}" onclick="seleccionar('${id}')">
-                            <b style="color:${colorTriangulo}">${nombreVisible}</b><br>
+                            <b style="color:#0f0">${nombreLimpio}</b><br>
                             🔋 ${data.bateria || "N/A"} | ⏰ ${data.hora || "--:--"}
                         </div>`;
                 });
@@ -202,13 +207,14 @@
         function abrirInfo(id) {
             const data = deviceData[id];
             const content = `<div style="color:#333; padding:10px; font-family:Arial; font-size:13px;">
-                <b style="color:#1A73E8; font-size:15px;">🛰️ ${id}</b><hr>
+                <b style="color:#1A73E8; font-size:15px;">🛰️ DISPOSITIVO: ${id}</b><hr>
                 <b>🔋 Batería:</b> ${data.bateria || 'N/A'}<br>
                 <b>⏰ Reporte:</b> ${data.hora || '--:--'}
             </div>`;
             infoWindow.setContent(content);
             infoWindow.open(map, markers[id]);
-            zIndexGlobal += 10; markers[id].zIndex = zIndexGlobal;
+            zIndexGlobal++;
+            markers[id].zIndex = zIndexGlobal;
         }
 
         function seleccionar(id) {
@@ -218,7 +224,7 @@
             document.getElementById("panel").classList.remove("minimized");
             if(markers[id]) {
                 map.panTo(markers[id].position);
-                map.setZoom(18);
+                map.setZoom(17);
                 abrirInfo(id);
             }
         }
@@ -228,12 +234,10 @@
             if(!fecha || !dispositivoSeleccionado) return alert("Seleccioná una fecha");
             if(historialRef) historialRef.off();
             if(polylineHistorial) polylineHistorial.setMap(null);
-
             polylineHistorial = new google.maps.Polyline({ path: [], map: map, strokeColor: '#F00', strokeWeight: 5 });
             historialRef = database.ref(`dispositivos/${dispositivoSeleccionado}/historial/${fecha}`);
-            
             historialRef.on('value', snap => {
-                if(!snap.exists()) return alert("Sin datos de historial");
+                if(!snap.exists()) return alert("Sin datos");
                 let puntos = [];
                 snap.forEach(h => { 
                     const p = h.val(); 
