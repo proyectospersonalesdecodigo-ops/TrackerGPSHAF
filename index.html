@@ -125,6 +125,198 @@
         }
 
         const _0xHAF = atob("QUl6YVN5RFV4b19VbDY1VVlMTklrbEt0UmhaX1VuVVM5a29BUjBZ");
+        const firebaseConfig = { databaseURL: "https://tracker-rastreador-haf-default-rtdb.firebaseio.com/" };
+        
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let map, infoWindow;
+        let markers = {}; 
+        let deviceData = {};
+        let dispositivoSeleccionado = null;
+        let polylineHistorial = null;
+        let historialRef = null; 
+        let zIndexGlobal = 1000;
+
+        (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?(console.warn(p+" only loads once. Re-queueing:",g),d[l](f,...n)):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({ key: _0xHAF, v: "weekly" });
+
+        async function initMap() {
+            const { Map, InfoWindow } = await google.maps.importLibrary("maps");
+            const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+
+            map = new Map(document.getElementById("map"), {
+                zoom: 14, center: {lat: -32.889, lng: -68.845}, mapId: "4504f8b37365c3d0",
+                disableDefaultUI: true, zoomControl: true
+            });
+            infoWindow = new InfoWindow();
+
+            database.ref("dispositivos").on('value', (snapshot) => {
+                const listaDiv = document.getElementById("lista-dispositivos");
+                if (!listaDiv) return;
+                listaDiv.innerHTML = ""; 
+
+                snapshot.forEach((childSnapshot) => {
+                    const id = childSnapshot.key;
+                    const data = childSnapshot.val().actual;
+                    if (!data) return;
+                    
+                    deviceData[id] = data;
+                    const pos = { lat: parseFloat(data.latitud), lng: parseFloat(data.longitud) };
+
+                    // --- DETECCIÓN INTELIGENTE DE DISPOSITIVO ---
+                    let colorTriangulo = "#0f0"; // Verde por defecto (Chico)
+                    let altoTriangulo = 22;
+                    let anchoMitad = 10;
+                    let idUpper = id.toUpperCase();
+
+                    // Si el nombre contiene G5 o G7, aplicar estilo AZUL GRANDE
+                    if (idUpper.includes("G5") || idUpper.includes("G7")) {
+                        colorTriangulo = "#1A73E8"; // Azul
+                        altoTriangulo = 35;
+                        anchoMitad = 16;
+                    }
+
+                    if (!markers[id]) {
+                        const icon = document.createElement("div");
+                        icon.style.width = "0";
+                        icon.style.height = "0";
+                        icon.style.borderLeft = `${anchoMitad}px solid transparent`;
+                        icon.style.borderRight = `${anchoMitad}px solid transparent`;
+                        icon.style.borderBottom = `${altoTriangulo}px solid ${colorTriangulo}`;
+                        icon.style.filter = "drop-shadow(0 0 3px white)";
+
+                        markers[id] = new AdvancedMarkerElement({ 
+                            map: map, 
+                            position: pos, 
+                            content: icon, 
+                            title: id, 
+                            zIndex: (idUpper.includes("G5") || idUpper.includes("G7")) ? 1001 : 1000
+                        });
+                        
+                        markers[id].addEventListener("gmp-click", () => {
+                            abrirInfo(id);
+                        });
+
+                    } else {
+                        markers[id].position = pos;
+                    }
+
+                    // Limpieza visual del nombre en la lista
+                    const nombreVisible = id.length > 20 ? id.substring(0, 18) + "..." : id;
+
+                    listaDiv.innerHTML += `
+                        <div id="card-${id}" class="dispositivo-card ${dispositivoSeleccionado === id ? 'selected' : ''}" onclick="seleccionar('${id}')">
+                            <b style="color:${colorTriangulo}">${nombreVisible}</b><br>
+                            🔋 ${data.bateria || "N/A"} | ⏰ ${data.hora || "--:--"}
+                        </div>`;
+                });
+            });
+        }
+
+        function abrirInfo(id) {
+            const data = deviceData[id];
+            const content = `<div style="color:#333; padding:10px; font-family:Arial; font-size:13px;">
+                <b style="color:#1A73E8; font-size:15px;">🛰️ DISPOSITIVO: ${id}</b><hr>
+                <b>🔋 Batería:</b> ${data.bateria || 'N/A'}<br>
+                <b>📶 Señal:</b> ${data.senal || 'N/A'}<br>
+                <b>⏰ Reporte:</b> ${data.hora || '--:--'}
+            </div>`;
+            infoWindow.setContent(content);
+            infoWindow.open(map, markers[id]);
+            
+            zIndexGlobal += 10;
+            markers[id].zIndex = zIndexGlobal;
+        }
+
+        function seleccionar(id) {
+            dispositivoSeleccionado = id;
+            document.getElementById("nombre-sel").innerText = id;
+            document.getElementById("seccion-historial").style.display = "block";
+            document.getElementById("panel").classList.remove("minimized");
+            if(markers[id]) {
+                map.panTo(markers[id].position);
+                map.setZoom(18);
+                abrirInfo(id);
+            }
+        }
+
+        async function verHistorial() {
+            const fecha = document.getElementById("inputFecha").value;
+            if(!fecha || !dispositivoSeleccionado) return alert("Seleccioná una fecha");
+            
+            if(historialRef) historialRef.off();
+            if(polylineHistorial) polylineHistorial.setMap(null);
+
+            polylineHistorial = new google.maps.Polyline({
+                path: [], map: map, strokeColor: '#F00', strokeWeight: 5
+            });
+
+            historialRef = database.ref(`dispositivos/${dispositivoSeleccionado}/historial/${fecha}`);
+            
+            historialRef.on('value', snap => {
+                if(!snap.exists()) return alert("Sin datos de historial");
+                
+                let puntos = [];
+                snap.forEach(h => { 
+                    const p = h.val(); 
+                    if(p.latitud && p.longitud) {
+                        puntos.push({lat: parseFloat(p.latitud), lng: parseFloat(p.longitud)});
+                    }
+                });
+
+                if(puntos.length > 0) {
+                    polylineHistorial.setPath(puntos);
+                    const bounds = new google.maps.LatLngBounds();
+                    puntos.forEach(p => bounds.extend(p));
+                    map.fitBounds(bounds);
+                }
+            });
+
+            togglePanel();
+        }
+
+        function regresarAlVivo() {
+            if(historialRef) { historialRef.off(); historialRef = null; }
+            document.getElementById("seccion-historial").style.display = "none";
+            if (polylineHistorial) { polylineHistorial.setMap(null); polylineHistorial = null; }
+            dispositivoSeleccionado = null;
+            const cards = document.querySelectorAll('.dispositivo-card');
+            cards.forEach(card => card.classList.remove('selected'));
+            if (infoWindow) infoWindow.close();
+            map.setZoom(14);
+            document.getElementById("panel").classList.remove("minimized");
+        }
+    </script>
+</body>
+</html>            
+            <div id="seccion-historial" style="display:none; border-top: 1px solid #333; margin-top: 15px; padding-top: 10px;">
+                <small style="color:#888">HISTORIAL DE: <b id="nombre-sel" style="color:#0f0"></b></small>
+                <input type="date" id="inputFecha">
+                <button class="btn-historial" onclick="verHistorial()">Consultar Historial</button>
+                <button class="btn-vivo" onclick="regresarAlVivo()">Regresar al Vivo</button>
+            </div>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <script>
+        function checkLogin() {
+            const user = document.getElementById("userInput").value;
+            const pass = document.getElementById("passInput").value;
+            if (user === "HAF" && pass === "189600") {
+                document.getElementById("login-screen").style.display = "none";
+                document.getElementById("main-content").style.display = "block";
+                initMap();
+            } else {
+                document.getElementById("errorMsg").style.display = "block";
+            }
+        }
+
+        function togglePanel() {
+            document.getElementById("panel").classList.toggle("minimized");
+        }
+
+        const _0xHAF = atob("QUl6YVN5RFV4b19VbDY1VVlMTklrbEt0UmhaX1VuVVM5a29BUjBZ");
         
         // ¡RECUERDA PEGAR TU ENLACE NUEVO!
         const firebaseConfig = { databaseURL: "https://tracker-rastreador-haf-default-rtdb.firebaseio.com/" };
