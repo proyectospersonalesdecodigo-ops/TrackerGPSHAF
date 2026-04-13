@@ -10,7 +10,6 @@
     <style>
         body { margin: 0; background: #000; color: #0f0; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100%; }
         
-        /* PANTALLA DE LOGIN */
         #login-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 9999; display: flex;
@@ -33,7 +32,6 @@
             cursor: pointer; text-transform: uppercase; margin-top: 10px;
         }
 
-        /* CONTENIDO PRINCIPAL */
         #main-content { display: none; }
         #map { height: 100vh; height: 100dvh; width: 100%; position: absolute; }
         
@@ -163,47 +161,35 @@
                     deviceData[id] = data;
                     const pos = { lat: parseFloat(data.latitud), lng: parseFloat(data.longitud) };
 
-                    // --- DETECCIÓN INTELIGENTE DE DISPOSITIVO ---
-                    let colorTriangulo = "#0f0"; // Verde por defecto (Chico)
-                    let altoTriangulo = 22;
-                    let anchoMitad = 10;
-                    let idUpper = id.toUpperCase();
-
-                    // Si el nombre contiene G5 o G7, aplicar estilo AZUL GRANDE
-                    if (idUpper.includes("G5") || idUpper.includes("G7")) {
-                        colorTriangulo = "#1A73E8"; // Azul
-                        altoTriangulo = 35;
-                        anchoMitad = 16;
+                    // Lógica de colores por nombre (G5 o G7 = Azul Grande, otros = Verde Chico)
+                    let colorTriangulo = "#0f0"; 
+                    let altoT = 22;
+                    let anchoM = 10;
+                    if (id.toUpperCase().includes("G5") || id.toUpperCase().includes("G7")) {
+                        colorTriangulo = "#1A73E8"; 
+                        altoT = 35;
+                        anchoM = 16;
                     }
 
                     if (!markers[id]) {
                         const icon = document.createElement("div");
-                        icon.style.width = "0";
-                        icon.style.height = "0";
-                        icon.style.borderLeft = `${anchoMitad}px solid transparent`;
-                        icon.style.borderRight = `${anchoMitad}px solid transparent`;
-                        icon.style.borderBottom = `${altoTriangulo}px solid ${colorTriangulo}`;
+                        icon.style.width = "0"; icon.style.height = "0";
+                        icon.style.borderLeft = `${anchoM}px solid transparent`;
+                        icon.style.borderRight = `${anchoM}px solid transparent`;
+                        icon.style.borderBottom = `${altoT}px solid ${colorTriangulo}`;
                         icon.style.filter = "drop-shadow(0 0 3px white)";
 
                         markers[id] = new AdvancedMarkerElement({ 
-                            map: map, 
-                            position: pos, 
-                            content: icon, 
-                            title: id, 
-                            zIndex: (idUpper.includes("G5") || idUpper.includes("G7")) ? 1001 : 1000
+                            map: map, position: pos, content: icon, title: id, 
+                            zIndex: (colorTriangulo === "#1A73E8" ? 1005 : 1000)
                         });
                         
-                        markers[id].addEventListener("gmp-click", () => {
-                            abrirInfo(id);
-                        });
-
+                        markers[id].addEventListener("gmp-click", () => abrirInfo(id));
                     } else {
                         markers[id].position = pos;
                     }
 
-                    // Limpieza visual del nombre en la lista
                     const nombreVisible = id.length > 20 ? id.substring(0, 18) + "..." : id;
-
                     listaDiv.innerHTML += `
                         <div id="card-${id}" class="dispositivo-card ${dispositivoSeleccionado === id ? 'selected' : ''}" onclick="seleccionar('${id}')">
                             <b style="color:${colorTriangulo}">${nombreVisible}</b><br>
@@ -216,16 +202,13 @@
         function abrirInfo(id) {
             const data = deviceData[id];
             const content = `<div style="color:#333; padding:10px; font-family:Arial; font-size:13px;">
-                <b style="color:#1A73E8; font-size:15px;">🛰️ DISPOSITIVO: ${id}</b><hr>
+                <b style="color:#1A73E8; font-size:15px;">🛰️ ${id}</b><hr>
                 <b>🔋 Batería:</b> ${data.bateria || 'N/A'}<br>
-                <b>📶 Señal:</b> ${data.senal || 'N/A'}<br>
                 <b>⏰ Reporte:</b> ${data.hora || '--:--'}
             </div>`;
             infoWindow.setContent(content);
             infoWindow.open(map, markers[id]);
-            
-            zIndexGlobal += 10;
-            markers[id].zIndex = zIndexGlobal;
+            zIndexGlobal += 10; markers[id].zIndex = zIndexGlobal;
         }
 
         function seleccionar(id) {
@@ -243,27 +226,19 @@
         async function verHistorial() {
             const fecha = document.getElementById("inputFecha").value;
             if(!fecha || !dispositivoSeleccionado) return alert("Seleccioná una fecha");
-            
             if(historialRef) historialRef.off();
             if(polylineHistorial) polylineHistorial.setMap(null);
 
-            polylineHistorial = new google.maps.Polyline({
-                path: [], map: map, strokeColor: '#F00', strokeWeight: 5
-            });
-
+            polylineHistorial = new google.maps.Polyline({ path: [], map: map, strokeColor: '#F00', strokeWeight: 5 });
             historialRef = database.ref(`dispositivos/${dispositivoSeleccionado}/historial/${fecha}`);
             
             historialRef.on('value', snap => {
                 if(!snap.exists()) return alert("Sin datos de historial");
-                
                 let puntos = [];
                 snap.forEach(h => { 
                     const p = h.val(); 
-                    if(p.latitud && p.longitud) {
-                        puntos.push({lat: parseFloat(p.latitud), lng: parseFloat(p.longitud)});
-                    }
+                    if(p.latitud && p.longitud) puntos.push({lat: parseFloat(p.latitud), lng: parseFloat(p.longitud)});
                 });
-
                 if(puntos.length > 0) {
                     polylineHistorial.setPath(puntos);
                     const bounds = new google.maps.LatLngBounds();
@@ -271,7 +246,6 @@
                     map.fitBounds(bounds);
                 }
             });
-
             togglePanel();
         }
 
@@ -280,214 +254,6 @@
             document.getElementById("seccion-historial").style.display = "none";
             if (polylineHistorial) { polylineHistorial.setMap(null); polylineHistorial = null; }
             dispositivoSeleccionado = null;
-            const cards = document.querySelectorAll('.dispositivo-card');
-            cards.forEach(card => card.classList.remove('selected'));
-            if (infoWindow) infoWindow.close();
-            map.setZoom(14);
-            document.getElementById("panel").classList.remove("minimized");
-        }
-    </script>
-</body>
-</html>            
-            <div id="seccion-historial" style="display:none; border-top: 1px solid #333; margin-top: 15px; padding-top: 10px;">
-                <small style="color:#888">HISTORIAL DE: <b id="nombre-sel" style="color:#0f0"></b></small>
-                <input type="date" id="inputFecha">
-                <button class="btn-historial" onclick="verHistorial()">Consultar Historial</button>
-                <button class="btn-vivo" onclick="regresarAlVivo()">Regresar al Vivo</button>
-            </div>
-        </div>
-        <div id="map"></div>
-    </div>
-
-    <script>
-        function checkLogin() {
-            const user = document.getElementById("userInput").value;
-            const pass = document.getElementById("passInput").value;
-            if (user === "HAF" && pass === "189600") {
-                document.getElementById("login-screen").style.display = "none";
-                document.getElementById("main-content").style.display = "block";
-                initMap();
-            } else {
-                document.getElementById("errorMsg").style.display = "block";
-            }
-        }
-
-        function togglePanel() {
-            document.getElementById("panel").classList.toggle("minimized");
-        }
-
-        const _0xHAF = atob("QUl6YVN5RFV4b19VbDY1VVlMTklrbEt0UmhaX1VuVVM5a29BUjBZ");
-        
-        // ¡RECUERDA PEGAR TU ENLACE NUEVO!
-        const firebaseConfig = { databaseURL: "https://tracker-rastreador-haf-default-rtdb.firebaseio.com/" };
-        
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-
-        let map, infoWindow;
-        let markers = {}; 
-        let deviceData = {};
-        let dispositivoSeleccionado = null;
-        let polylineHistorial = null;
-        let historialRef = null; 
-        // Empezamos con una base alta para los z-index (así siempre están sobre el mapa básico)
-        let zIndexGlobal = 1000;
-
-        // Paleta de colores fuertes (Rojo, Azul, Amarillo, Naranja, Marrón, Púrpura, Verde, Naranja rojizo)
-        const coloresFuertes = ["#D32F2F", "#1976D2", "#FBC02D", "#F57C00", "#795548", "#8E24AA", "#388E3C", "#E64A19"];
-
-        (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?(console.warn(p+" only loads once. Re-queueing:",g),d[l](f,...n)):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({ key: _0xHAF, v: "weekly" });
-
-        async function initMap() {
-            const { Map, InfoWindow } = await google.maps.importLibrary("maps");
-            const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
-
-            map = new Map(document.getElementById("map"), {
-                zoom: 14, center: {lat: -32.889, lng: -68.845}, mapId: "4504f8b37365c3d0",
-                disableDefaultUI: true, zoomControl: true
-            });
-            infoWindow = new InfoWindow();
-
-            database.ref("dispositivos").on('value', (snapshot) => {
-                const listaDiv = document.getElementById("lista-dispositivos");
-                if (!listaDiv) return;
-                listaDiv.innerHTML = ""; 
-
-                let indice = 0; // Usado para que los tamaños y colores cambien por cada vehículo
-
-                snapshot.forEach((childSnapshot) => {
-                    const id = childSnapshot.key;
-                    const data = childSnapshot.val().actual;
-                    if (!data) return;
-                    
-                    deviceData[id] = data;
-                    const pos = { lat: parseFloat(data.latitud), lng: parseFloat(data.longitud) };
-
-                    // Determinamos el color usando el índice que va aumentando
-                    let colorLlamativo = coloresFuertes[indice % coloresFuertes.length];
-
-                    if (!markers[id]) {
-                        
-                        // --- FÓRMULA DE CRECIMIENTO CONSTANTE Y SUPERPOSICIÓN ---
-                        // Cada nuevo auto es ligeramente más alto y ancho.
-                        // Vehiculo 1: 32px, Vehiculo 2: 38px, Vehiculo 3: 44px...
-                        let altoTriangulo = 32 + (indice * 6); 
-                        let anchoMital = altoTriangulo / 2.2; 
-
-                        const icon = document.createElement("div");
-                        icon.style.width = "0";
-                        icon.style.height = "0";
-                        icon.style.borderLeft = `${anchoMital}px solid transparent`;
-                        icon.style.borderRight = `${anchoMital}px solid transparent`;
-                        icon.style.borderBottom = `${altoTriangulo}px solid ${colorLlamativo}`;
-                        // Sombra sutil oscura alrededor
-                        icon.style.filter = "drop-shadow(0 0 3px rgba(255,255,255,0.7))";
-                        
-                        // Para que el más chiquito no quede tapado por uno grande en la misma cuadra, le damos un z-index más alto al índice menor
-                        let zIndexFijo = zIndexGlobal - indice;
-
-                        markers[id] = new AdvancedMarkerElement({ 
-                            map: map, 
-                            position: pos, 
-                            content: icon, 
-                            title: id, 
-                            zIndex: zIndexFijo,
-                            gmpClickable: true 
-                        });
-                        
-                        markers[id].addEventListener("gmp-click", () => {
-                            abrirInfo(id);
-                        });
-
-                    } else {
-                        // Si ya existe en el mapa, solo actualizamos coordenadas
-                        markers[id].position = pos;
-                    }
-
-                    // Botón en la lista
-                    listaDiv.innerHTML += `
-                        <div id="card-${id}" class="dispositivo-card ${dispositivoSeleccionado === id ? 'selected' : ''}" onclick="seleccionar('${id}')">
-                            <b style="color:${colorLlamativo}; text-shadow: 0 0 2px #000;">${id}</b><br>
-                            🔋 ${data.bateria || "N/A"} | ⏰ ${data.hora || "--:--"}
-                        </div>`;
-
-                    indice++; // Pasamos al siguiente vehículo, lo que cambiará el tamaño y color
-                });
-            });
-        }
-
-        function abrirInfo(id) {
-            const data = deviceData[id];
-            const content = `<div style="color:#333; padding:10px; font-family:Arial; font-size:13px;">
-                <b style="color:#1A73E8; font-size:15px;">🛰️ DISPOSITIVO: ${id}</b><hr>
-                <b>🔋 Batería:</b> ${data.bateria || 'N/A'}<br>
-                <b>📶 Señal:</b> ${data.senal || 'N/A'}<br>
-                <b>⏰ Reporte:</b> ${data.hora || '--:--'}
-            </div>`;
-            infoWindow.setContent(content);
-            infoWindow.open(map, markers[id]);
-            
-            // Para que este auto resalte sobre absolutamente todos cuando hacemos click
-            zIndexGlobal += 100;
-            markers[id].zIndex = zIndexGlobal;
-        }
-
-        function seleccionar(id) {
-            dispositivoSeleccionado = id;
-            document.getElementById("nombre-sel").innerText = id;
-            document.getElementById("seccion-historial").style.display = "block";
-            document.getElementById("panel").classList.remove("minimized");
-            if(markers[id]) {
-                map.panTo(markers[id].position);
-                map.setZoom(17);
-                abrirInfo(id);
-            }
-        }
-
-        async function verHistorial() {
-            const fecha = document.getElementById("inputFecha").value;
-            if(!fecha || !dispositivoSeleccionado) return alert("Seleccioná una fecha");
-            
-            if(historialRef) historialRef.off();
-            if(polylineHistorial) polylineHistorial.setMap(null);
-
-            polylineHistorial = new google.maps.Polyline({
-                path: [], map: map, strokeColor: '#F00', strokeWeight: 5
-            });
-
-            historialRef = database.ref(`dispositivos/${dispositivoSeleccionado}/historial/${fecha}`);
-            
-            historialRef.on('value', snap => {
-                if(!snap.exists()) return console.log("Sin datos");
-                
-                let puntos = [];
-                snap.forEach(h => { 
-                    const p = h.val(); 
-                    if(p.latitud && p.longitud) {
-                        puntos.push({lat: parseFloat(p.latitud), lng: parseFloat(p.longitud)});
-                    }
-                });
-
-                if(puntos.length > 0) {
-                    polylineHistorial.setPath(puntos);
-                    if (puntos.length === 1 || !map.getBounds()) {
-                         const bounds = new google.maps.LatLngBounds();
-                         puntos.forEach(p => bounds.extend(p));
-                         map.fitBounds(bounds);
-                    }
-                }
-            });
-
-            togglePanel();
-        }
-
-        function regresarAlVivo() {
-            if(historialRef) { historialRef.off(); historialRef = null; }
-            document.getElementById("seccion-historial").style.display = "none";
-            if (polylineHistorial) { polylineHistorial.setMap(null); polylineHistorial = null; }
-            dispositivoSeleccionado = null;
-            const cards = document.querySelectorAll('.dispositivo-card');
-            cards.forEach(card => card.classList.remove('selected'));
             if (infoWindow) infoWindow.close();
             map.setZoom(14);
             document.getElementById("panel").classList.remove("minimized");
