@@ -1,0 +1,20 @@
+{
+  "name": "HAF Monitor Pro",
+  "short_name": "HAF Monitor",
+  "description": "Sistema de monitoreo de seguridad HAF",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#00ff00",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/684/684908.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+
+
