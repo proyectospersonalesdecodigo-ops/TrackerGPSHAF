@@ -78,7 +78,6 @@
         .btn-historial { background: #0f0; color: #000; }
         .btn-vivo { background: #333; color: #fff; margin-top: 10px; }
 
-        /* ESTILOS DE TRIÁNGULOS */
         .triangulo-g7 { width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-bottom: 35px solid #1A73E8; filter: drop-shadow(0 0 4px white); }
         .triangulo-v2 { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 22px solid #0f0; filter: drop-shadow(0 0 3px white); }
     </style>
@@ -147,6 +146,8 @@
             const { Map, InfoWindow } = await google.maps.importLibrary("maps");
             const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
 
+            console.log("Sistema de Mapas Inicializado");
+
             map = new Map(document.getElementById("map"), {
                 zoom: 14, center: {lat: -32.889, lng: -68.845}, mapId: "4504f8b37365c3d0",
                 disableDefaultUI: true, zoomControl: true
@@ -158,19 +159,41 @@
                 if (!listaDiv) return;
                 listaDiv.innerHTML = ""; 
 
+                if (!snapshot || !snapshot.exists()) {
+                    console.warn("No hay datos en Firebase.");
+                    return;
+                }
+
+                console.log("--- ACTUALIZACIÓN DESDE FIREBASE ---");
+                
                 snapshot.forEach((childSnapshot) => {
                     const id = childSnapshot.key;
-                    const data = childSnapshot.val().actual;
-                    if (!data) return;
+                    const fullVal = childSnapshot.val();
                     
+                    // --- PROTECCIÓN LÍNEA 149 ---
+                    if (!fullVal || !fullVal.actual) {
+                        console.warn(`Dispositivo ${id} ignorado: falta carpeta 'actual'.`);
+                        return;
+                    }
+
+                    const data = fullVal.actual;
                     deviceData[id] = data;
-                    const pos = { lat: parseFloat(data.latitud), lng: parseFloat(data.longitud) };
+                    
+                    const lat = parseFloat(data.latitud);
+                    const lng = parseFloat(data.longitud);
+
+                    if (isNaN(lat) || isNaN(lng)) {
+                        console.error(`Coordenadas inválidas para ${id}`);
+                        return;
+                    }
+
+                    const pos = { lat, lng };
 
                     if (!markers[id]) {
                         const icon = document.createElement("div");
-                        
-                        // LÓGICA INTELIGENTE: Detecta G5 o G7 en el nombre automático
                         let idUpper = id.toUpperCase();
+                        
+                        // Diferenciación de triángulos
                         if (idUpper.includes("G5") || idUpper.includes("G7") || idUpper.includes("MOTOG7")) {
                             icon.className = "triangulo-g7";
                         } else {
@@ -192,7 +215,6 @@
                         markers[id].position = pos;
                     }
 
-                    // Limpiamos el nombre largo para que no rompa el diseño del panel
                     const nombreLimpio = id.split("__")[0].replace(/_/g, " ");
 
                     listaDiv.innerHTML += `
@@ -201,13 +223,16 @@
                             🔋 ${data.bateria || "N/A"} | ⏰ ${data.hora || "--:--"}
                         </div>`;
                 });
+            }, (error) => {
+                console.error("Error de Firebase:", error);
             });
         }
 
         function abrirInfo(id) {
             const data = deviceData[id];
+            if (!data) return;
             const content = `<div style="color:#333; padding:10px; font-family:Arial; font-size:13px;">
-                <b style="color:#1A73E8; font-size:15px;">🛰️ DISPOSITIVO: ${id}</b><hr>
+                <b style="color:#1A73E8; font-size:15px;">🛰️ ${id}</b><hr>
                 <b>🔋 Batería:</b> ${data.bateria || 'N/A'}<br>
                 <b>⏰ Reporte:</b> ${data.hora || '--:--'}
             </div>`;
@@ -234,15 +259,21 @@
             if(!fecha || !dispositivoSeleccionado) return alert("Seleccioná una fecha");
             if(historialRef) historialRef.off();
             if(polylineHistorial) polylineHistorial.setMap(null);
+            
             polylineHistorial = new google.maps.Polyline({ path: [], map: map, strokeColor: '#F00', strokeWeight: 5 });
             historialRef = database.ref(`dispositivos/${dispositivoSeleccionado}/historial/${fecha}`);
+            
             historialRef.on('value', snap => {
                 if(!snap.exists()) return alert("Sin datos");
+                
                 let puntos = [];
                 snap.forEach(h => { 
                     const p = h.val(); 
-                    if(p.latitud && p.longitud) puntos.push({lat: parseFloat(p.latitud), lng: parseFloat(p.longitud)});
+                    if(p && p.latitud && p.longitud) {
+                        puntos.push({lat: parseFloat(p.latitud), lng: parseFloat(p.longitud)});
+                    }
                 });
+                
                 if(puntos.length > 0) {
                     polylineHistorial.setPath(puntos);
                     const bounds = new google.maps.LatLngBounds();
