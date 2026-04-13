@@ -2,13 +2,20 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HAF Monitor Pro - Acceso Restringido</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>HAF Monitor Pro</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/684/684908.png">
+
     <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-database-compat.js"></script>
     
     <style>
-        body { margin: 0; background: #000; color: #0f0; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100%; }
+        body { margin: 0; background: #000; color: #0f0; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100%; width: 100%; position: fixed; }
         
         /* PANTALLA DE LOGIN */
         #login-screen {
@@ -57,10 +64,10 @@
                 top: auto; bottom: 0; left: 0; width: 100%; 
                 max-height: 50vh; border-radius: 20px 20px 0 0;
                 padding: 15px; border: 1px solid #0f0; border-bottom: none;
-                box-sizing: border-box;
+                box-sizing: border-box; padding-bottom: 30px; /* Espacio para barra de navegación móvil */
             }
             .handle { display: block; }
-            #panel.minimized { transform: translateY(calc(100% - 40px)); }
+            #panel.minimized { transform: translateY(calc(100% - 60px)); }
             #lista-dispositivos { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 10px; }
             .dispositivo-card { min-width: 180px; margin-bottom: 0 !important; flex-shrink: 0; }
         }
@@ -84,8 +91,8 @@
     <div id="login-screen">
         <div class="login-box">
             <h2>HAF SECURITY</h2>
-            <input type="text" id="userInput" placeholder="USUARIO">
-            <input type="password" id="passInput" placeholder="CONTRASEÑA">
+            <input type="text" id="userInput" placeholder="USUARIO" autocomplete="username">
+            <input type="password" id="passInput" placeholder="CONTRASEÑA" autocomplete="current-password">
             <button class="btn-login" onclick="checkLogin()">ACCEDER</button>
             <p id="errorMsg" style="color: red; font-size: 12px; margin-top: 10px; display: none;">DATOS INCORRECTOS</p>
         </div>
@@ -108,6 +115,7 @@
     </div>
 
     <script>
+        // Función de Login
         function checkLogin() {
             const user = document.getElementById("userInput").value;
             const pass = document.getElementById("passInput").value;
@@ -124,6 +132,7 @@
             document.getElementById("panel").classList.toggle("minimized");
         }
 
+        // Firebase Setup
         const _0xHAF = atob("QUl6YVN5RFV4b19VbDY1VVlMTklrbEt0UmhaX1VuVVM5a29BUjBZ");
         const firebaseConfig = { databaseURL: "https://tracker-rastreador-haf-default-rtdb.firebaseio.com/" };
         firebase.initializeApp(firebaseConfig);
@@ -137,7 +146,6 @@
         let historialRef = null; 
         let zIndexGlobal = 1000;
 
-        // PALETA DE COLORES OSCUROS
         const paletaColores = ["#D32F2F", "#1976D2", "#FBC02D", "#5D4037", "#212121", "#455A64", "#388E3C", "#E64A19"];
 
         (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?(console.warn(p+" only loads once. Re-queueing:",g),d[l](f,...n)):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({ key: _0xHAF, v: "weekly" });
@@ -158,18 +166,14 @@
                 listaDiv.innerHTML = ""; 
 
                 let indice = 0;
-
                 snapshot.forEach((childSnapshot) => {
                     const id = childSnapshot.key;
                     const fullVal = childSnapshot.val();
-                    
                     if (!fullVal || !fullVal.actual) return;
 
                     const data = fullVal.actual;
                     deviceData[id] = data;
                     const pos = { lat: parseFloat(data.latitud), lng: parseFloat(data.longitud) };
-
-                    // ASIGNAMOS COLOR OSCURO DE LA LISTA
                     let colorActual = paletaColores[indice % paletaColores.length];
 
                     if (!markers[id]) {
@@ -197,7 +201,7 @@
                         </div>`;
                     indice++;
                 });
-            }, (error) => { console.error("Error Firebase:", error); });
+            });
         }
 
         function abrirInfo(id) {
@@ -257,6 +261,15 @@
             if (infoWindow) infoWindow.close();
             map.setZoom(14);
             document.getElementById("panel").classList.remove("minimized");
+        }
+
+        // --- REGISTRO DEL SERVICE WORKER (PWA) ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker Registrado'))
+                    .catch(err => console.error('Error al registrar SW', err));
+            });
         }
     </script>
 </body>
