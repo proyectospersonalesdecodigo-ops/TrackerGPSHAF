@@ -93,11 +93,17 @@
         
         h3 { margin: 0 0 15px 0; text-align: center; color: #0f0; text-shadow: 0 0 5px #0f0; font-size: 18px; }
         
-        /* ESTILOS DE INPUTS DE FECHA Y HORA */
-        .historial-controls { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
-        .time-row { display: flex; gap: 5px; }
-        .time-row div { flex: 1; display: flex; flex-direction: column; }
-        .time-row label { font-size: 10px; color: #888; margin-bottom: 2px; text-transform: uppercase; }
+        /* ESTILOS DE TRIÁNGULOS TÁCTICOS */
+        .net-tactical { display: flex; align-items: center; justify-content: space-around; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #999; }
+        .tri-indicator { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+        .tri-label { font-size: 8px; text-transform: uppercase; color: #777; font-weight: bold; }
+        
+        .tri-wifi { color: #00d4ff; font-size: 20px; line-height: 1; }   /* ▲ Cian Grande */
+        .tri-antena { color: #ffaa00; font-size: 15px; line-height: 1; } /* ◣ Naranja Mediano */
+        .tri-datos { color: #00ff66; font-size: 11px; line-height: 1; }  /* ▼ Verde Chico */
+        
+        .tri-off { color: #bbb !important; opacity: 0.4; }
+        .tri-val { font-size: 9px; font-weight: bold; color: #333; }
 
         input[type="date"], input[type="time"] { 
             width: 100%; background: #222; color: #fff; border: 1px solid #444; 
@@ -171,7 +177,6 @@
             document.getElementById("panel").classList.toggle("minimized");
         }
 
-        // Firebase Setup
         const _0xHAF = atob("QUl6YVN5RFV4b19VbDY1VVlMTklrbEt0UmhaX1VuVVM5a29BUjBZ");
         const firebaseConfig = { databaseURL: "https://tracker-rastreador-haf-default-rtdb.firebaseio.com/" };
         firebase.initializeApp(firebaseConfig);
@@ -232,39 +237,46 @@
                             }
                         });
                         markers[id].addListener("click", () => seleccionar(id));
-                    } else {
-                        markers[id].setPosition(pos);
-                    }
+                    } else { markers[id].setPosition(pos); }
 
                     const nombreLimpio = String(id).split("__")[0].replace(/_/g, " ");
+                    const batDisplay = data.bateria || "---";
+                    const isCharging = data.is_charging === "SI" ? "⚡" : "";
+                    const horaDisplay = data.hora || "---";
                     
-                    let estadoRed = "🟢 Red Estable";
-                    let colorRed = "#008000";
-                    if (data.hora) {
-                        try {
-                            const [h, m, s] = data.hora.split(":");
-                            const hRep = new Date();
-                            hRep.setHours(h, m, s || 0);
-                            if (Math.abs(new Date() - hRep) / 1000 > 60) {
-                                estadoRed = "🔴 Vehículo Sin Internet";
-                                colorRed = "#d00000";
-                            }
-                        } catch(e){}
-                    }
-
-                    const batDisplay = data.bateria || "SIN DATOS";
-                    const horaDisplay = data.hora || "SIN DATOS";
-                    const gpsDisplay = data.status || "SIN DATOS";
-
-                    listaDiv.innerHTML += `
-                        <div id="card-${id}" class="dispositivo-card ${dispositivoSeleccionado === id ? 'selected' : ''}" onclick="seleccionar('${id}')">
-                            <b style="color:${colorActual}">${nombreLimpio}</b><br>
-                            🔋 ${batDisplay}${batDisplay !== "SIN DATOS" ? "%" : ""} | ⏰ ${horaDisplay}
-                            <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #999;">
-                                <small style="color:${colorRed}; font-weight:bold; display:block;">📶 ${estadoRed}</small>
-                                <small style="color:#555; display:block;">🛰️ GPS: ${gpsDisplay}</small>
-                            </div>
-                        </div>`;
+                    // LÓGICA DE TRIÁNGULOS TÁCTICOS CON SSID
+const nWifi = data.net_wifi === "ON";
+const nSsid = data.net_ssid || "Wi-Fi"; // <--- Capturamos el nombre
+const nWifiPct = data.wifi_pct || "0%";
+const nAntenaPct = data.antena_pct || "0%";
+const nDatosOk = data.net_datos === "ON";
+listaDiv.innerHTML += `
+    <div id="card-${id}" class="dispositivo-card ${dispositivoSeleccionado === id ? 'selected' : ''}" onclick="seleccionar('${id}')">
+        <b style="color:${colorActual}">${nombreLimpio}</b> | 🔋 ${batDisplay}${isCharging} | ⏰ ${horaDisplay}
+        
+        <div class="net-tactical">
+            <!-- TRIANGULO WIFI + SSID -->
+            <div class="tri-indicator" style="width: 33%">
+                <span class="tri-wifi ${!nWifi ? 'tri-off' : ''}">▲</span>
+                <span class="tri-label">${nWifi ? nSsid : 'Wifi'}</span> <!-- Muestra el nombre aquí -->
+                <span class="tri-val">${nWifi ? nWifiPct : 'OFF'}</span>
+            </div>
+            
+            <!-- ANTENA (RAYITAS REALES DEL CHIP) -->
+            <div class="tri-indicator" style="width: 33%">
+                <span class="tri-antena">◣</span>
+                <span class="tri-label">Antena</span>
+                <span class="tri-val">${nAntenaPct}</span>
+            </div>
+            
+            <!-- DATOS (INTERNET MÓVIL) -->
+            <div class="tri-indicator" style="width: 33%">
+                <span class="tri-datos ${!nDatosOk ? 'tri-off' : ''}">▼</span>
+                <span class="tri-label">Datos</span>
+                <span class="tri-val">${nDatosOk ? 'OK' : 'OFF'}</span>
+            </div>
+        </div>
+    </div>`;
                     indice++;
                 });
             });
@@ -274,21 +286,17 @@
             dispositivoSeleccionado = id;
             document.getElementById("nombre-sel").innerText = id;
             document.getElementById("seccion-historial").style.display = "block";
-            
             const data = deviceData[id];
             if(markers[id]) {
                 map.panTo(markers[id].getPosition());
                 map.setZoom(17);
-                
-                const bat = data.bateria || "SIN DATOS";
-                const status = data.status || "SIN DATOS";
-                
-                infoWindow.setContent(`<div style="color:#000"><b>${id}</b><br>Batería: ${bat}${bat !== "SIN DATOS" ? "%" : ""}<br>GPS: ${status}</div>`);
+                const bat = data.bateria || "---";
+                const diag = data.net_wifi === "ON" ? "Wi-Fi" : "Datos Móviles";
+                infoWindow.setContent(`<div style="color:#000"><b>${id}</b><br>Batería: ${bat}${data.is_charging === "SI" ? "⚡" : ""}<br>Internet: ${diag}</div>`);
                 infoWindow.open(map, markers[id]);
             }
         }
 
-        // --- LÓGICA DE HISTORIAL CON FILTRO DE HORAS ---
         let polylineHistorial = null;
         let historialRef = null;
 
@@ -296,36 +304,25 @@
             const fecha = document.getElementById("inputFecha").value;
             const hInicio = document.getElementById("horaInicio").value;
             const hFin = document.getElementById("horaFin").value;
-
             if(!fecha || !dispositivoSeleccionado) return alert("Seleccioná una fecha y un dispositivo");
-            
             if(historialRef) historialRef.off();
             if(polylineHistorial) polylineHistorial.setMap(null);
-            
             polylineHistorial = new google.maps.Polyline({
                 path: [], map: map, strokeColor: '#FF0000', strokeOpacity: 1.0, strokeWeight: 4,
                 icons: [{ icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW }, offset: '100%', repeat: '50px' }]
             });
-
-            // Convertir horas a minutos para comparación fácil
             const minInicio = (parseInt(hInicio.split(":")[0]) * 60) + parseInt(hInicio.split(":")[1]);
             const minFin = (parseInt(hFin.split(":")[0]) * 60) + parseInt(hFin.split(":")[1]);
-
             historialRef = database.ref(`dispositivos/${dispositivoSeleccionado}/historial/${fecha}`);
             historialRef.on('value', snap => {
                 if(!snap.exists()) return alert("No hay datos de historial para esta fecha.");
-                
                 let puntos = [];
                 const bounds = new google.maps.LatLngBounds();
-
                 snap.forEach(h => { 
                     const p = h.val(); 
                     if(p && p.latitud && p.longitud && p.hora) {
-                        // Calcular minutos del reporte actual
                         const hPartes = p.hora.split(":");
                         const minReporte = (parseInt(hPartes[0]) * 60) + parseInt(hPartes[1]);
-
-                        // Filtrar por el rango de horas seleccionado
                         if(minReporte >= minInicio && minReporte <= minFin) {
                             const coord = {lat: parseFloat(p.latitud), lng: parseFloat(p.longitud)};
                             puntos.push(coord);
@@ -333,14 +330,10 @@
                         }
                     }
                 });
-
                 if(puntos.length > 0) {
                     polylineHistorial.setPath(puntos);
                     map.fitBounds(bounds);
-                    if (window.innerWidth < 600) togglePanel(); 
-                } else {
-                    alert("No hay registros en ese rango horario.");
-                }
+                } else { alert("No hay registros en ese rango horario."); }
             });
         }
 
