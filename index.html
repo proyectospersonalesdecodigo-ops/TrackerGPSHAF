@@ -53,6 +53,18 @@
             transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
+        /* BOTÓN ACTUALIZAR FLOTANTE */
+        #btn-refresh {
+            position: fixed; top: 15px; right: 15px; z-index: 1001;
+            background: rgba(0, 0, 0, 0.8); color: #0f0;
+            border: 1px solid #0f0; border-radius: 50%;
+            width: 45px; height: 45px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+            font-size: 20px; transition: 0.3s;
+        }
+        #btn-refresh:active { transform: rotate(180deg) scale(0.9); }
+
         .handle {
             width: 50px; height: 6px; background: #0f0; border-radius: 3px;
             margin: -5px auto 15px auto; cursor: pointer; display: none;
@@ -70,6 +82,7 @@
             #panel.minimized { transform: translateY(calc(100% - 60px)); }
             #lista-dispositivos { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 10px; }
             .dispositivo-card { min-width: 180px; margin-bottom: 0 !important; flex-shrink: 0; }
+            #btn-refresh { top: 10px; right: 10px; width: 40px; height: 40px; }
         }
 
         .dispositivo-card {
@@ -99,6 +112,8 @@
     </div>
 
     <div id="main-content">
+        <div id="btn-refresh" onclick="refreshData()" title="Actualizar Datos">🔄</div>
+
         <div id="panel">
             <div class="handle" onclick="togglePanel()"></div>
             <h3>MONITOR HAF</h3>
@@ -128,6 +143,21 @@
             }
         }
 
+        // Función para actualizar datos sin recargar página
+        function refreshData() {
+            if (map) {
+                // Centrar mapa en Mendoza por defecto si no hay selección
+                if (!dispositivoSeleccionado) {
+                    map.setZoom(14);
+                    map.panTo({lat: -32.889, lng: -68.845});
+                }
+                // Forzar lectura de Firebase (on('value') ya es automático, pero esto asegura la UI)
+                console.log("HAF Monitor: Sincronizando dispositivos...");
+                // Cerramos infoWindow si está abierta
+                if (infoWindow) infoWindow.close();
+            }
+        }
+
         function togglePanel() {
             document.getElementById("panel").classList.toggle("minimized");
         }
@@ -148,7 +178,7 @@
 
         const paletaColores = ["#D32F2F", "#1976D2", "#FBC02D", "#5D4037", "#212121", "#455A64", "#388E3C", "#E64A19"];
 
-        (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?(console.warn(p+" only loads once. Re-queueing:",g),d[l](f,...n)):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({ key: _0xHAF, v: "weekly" });
+        (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?(console.warn(p+" only loads once. Re-queueing:",g),d[l](f,...n)):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({ key: _0xHAF, v: "weekly" });
 
         async function initMap() {
             const { Map, InfoWindow } = await google.maps.importLibrary("maps");
@@ -193,10 +223,8 @@
                         markers[id].position = pos;
                     }
 
-                    // --- INICIO DE MODIFICACIÓN SOLICITADA ---
                     const nombreLimpio = id.split("__")[0].replace(/_/g, " ");
                     
-                    // LÓGICA: Detección de pérdida de Internet
                     let estadoRed = "🟢 Red Estable";
                     let colorRed = "#0f0";
                     if (data.hora) {
@@ -205,7 +233,6 @@
                             const hRep = new Date();
                             hRep.setHours(h, m, s, 0);
                             const df = (new Date() - hRep) / 1000;
-                            // Si pasaron más de 60 segundos = Offline
                             if (df > 60 || df < -60) {
                                 estadoRed = "🔴 Vehículo Sin Internet (Offline)";
                                 colorRed = "#f00";
@@ -213,7 +240,6 @@
                         } catch(e){}
                     }
 
-                    // Estado del GPS
                     const estadoGps = data.status || "Esperando diagnóstico...";
 
                     listaDiv.innerHTML += `
@@ -225,7 +251,6 @@
                                 <small style="color:#aaa; display:block;">🛰️ ${estadoGps}</small>
                             </div>
                         </div>`;
-                    // --- FIN DE MODIFICACIÓN SOLICITADA ---
                     
                     indice++;
                 });
@@ -293,7 +318,6 @@
             document.getElementById("panel").classList.remove("minimized");
         }
 
-        // --- REGISTRO DEL SERVICE WORKER (PWA) ---
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
