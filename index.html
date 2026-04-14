@@ -15,7 +15,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-database-compat.js"></script>
     
     <style>
-        body { margin: 0; background: #000; color: #0f0; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100%; width: 100%; position: fixed; }
+        body { margin: 0; background: #000; color: #0f0; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; width: 100vw; position: fixed; }
         
         /* PANTALLA DE LOGIN */
         #login-screen {
@@ -24,7 +24,7 @@
             justify-content: center; align-items: center; flex-direction: column;
         }
         .login-box {
-            background: rgba(0, 20, 0, 0.92); padding: 30px;
+            background: rgba(0, 20, 0, 0.95); padding: 30px;
             border: 2px solid #0f0; border-radius: 15px;
             box-shadow: 0 0 20px #0f0; text-align: center; width: 280px;
         }
@@ -41,8 +41,8 @@
         }
 
         /* CONTENIDO PRINCIPAL */
-        #main-content { display: none; }
-        #map { height: 100vh; height: 100dvh; width: 100%; position: absolute; }
+        #main-content { display: none; width: 100%; height: 100%; }
+        #map { height: 100vh; width: 100%; position: absolute; top: 0; left: 0; }
         
         #panel { 
             position: fixed; top: 15px; left: 15px; z-index: 1000; 
@@ -53,7 +53,6 @@
             transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* BOTÓN ACTUALIZAR FLOTANTE */
         #btn-refresh {
             position: fixed; top: 15px; right: 15px; z-index: 1001;
             background: rgba(0, 0, 0, 0.8); color: #0f0;
@@ -63,7 +62,7 @@
             box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
             font-size: 20px; transition: 0.3s;
         }
-        #btn-refresh:active { transform: rotate(180deg) scale(0.9); }
+        #btn-refresh:active { transform: scale(0.9) rotate(90deg); }
 
         .handle {
             width: 50px; height: 6px; background: #0f0; border-radius: 3px;
@@ -81,16 +80,16 @@
             .handle { display: block; }
             #panel.minimized { transform: translateY(calc(100% - 60px)); }
             #lista-dispositivos { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 10px; }
-            .dispositivo-card { min-width: 180px; margin-bottom: 0 !important; flex-shrink: 0; }
-            #btn-refresh { top: 10px; right: 10px; width: 40px; height: 40px; }
+            .dispositivo-card { min-width: 190px; margin-bottom: 0 !important; flex-shrink: 0; }
         }
 
         .dispositivo-card {
-            background: #111; border: 1px solid #333;
+            background: #f0f0f0; border: 1px solid #333;
             padding: 12px; margin-bottom: 10px; border-radius: 8px;
             font-size: 13px; cursor: pointer; transition: 0.3s;
+            color: #000;
         }
-        .dispositivo-card.selected { border-left: 5px solid #0f0; background: #222; border-color: #0f0; }
+        .dispositivo-card.selected { border: 2px solid #0f0; background: #fff; }
         
         h3 { margin: 0 0 15px 0; text-align: center; color: #0f0; text-shadow: 0 0 5px #0f0; font-size: 18px; }
         input[type="date"] { width: 100%; background: #222; color: #fff; border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 6px; box-sizing: border-box; outline: none; }
@@ -112,15 +111,14 @@
     </div>
 
     <div id="main-content">
-        <div id="btn-refresh" onclick="refreshData()" title="Actualizar Datos">🔄</div>
-
+        <div id="btn-refresh" onclick="refreshUI()" title="Sincronizar Datos">🔄</div>
         <div id="panel">
             <div class="handle" onclick="togglePanel()"></div>
             <h3>MONITOR HAF</h3>
             <div id="lista-dispositivos">Esperando señal...</div>
             
             <div id="seccion-historial" style="display:none; border-top: 1px solid #333; margin-top: 15px; padding-top: 10px;">
-                <small style="color:#888">HISTORIAL DE: <b id="nombre-sel" style="color:#0f0"></b></small>
+                <small style="color:#000">HISTORIAL DE: <b id="nombre-sel" style="color:#000"></b></small>
                 <input type="date" id="inputFecha">
                 <button class="btn-historial" onclick="verHistorial()">Consultar Historial</button>
                 <button class="btn-vivo" onclick="regresarAlVivo()">Regresar al Vivo</button>
@@ -130,31 +128,15 @@
     </div>
 
     <script>
-        // Función de Login
         function checkLogin() {
             const user = document.getElementById("userInput").value;
             const pass = document.getElementById("passInput").value;
             if (user === "HAF" && pass === "189600") {
                 document.getElementById("login-screen").style.display = "none";
                 document.getElementById("main-content").style.display = "block";
-                setTimeout(() => { initMap(); }, 150);
+                loadGoogleMaps();
             } else {
                 document.getElementById("errorMsg").style.display = "block";
-            }
-        }
-
-        // Función para actualizar datos sin recargar página
-        function refreshData() {
-            if (map) {
-                // Centrar mapa en Mendoza por defecto si no hay selección
-                if (!dispositivoSeleccionado) {
-                    map.setZoom(14);
-                    map.panTo({lat: -32.889, lng: -68.845});
-                }
-                // Forzar lectura de Firebase (on('value') ya es automático, pero esto asegura la UI)
-                console.log("HAF Monitor: Sincronizando dispositivos...");
-                // Cerramos infoWindow si está abierta
-                if (infoWindow) infoWindow.close();
             }
         }
 
@@ -162,7 +144,6 @@
             document.getElementById("panel").classList.toggle("minimized");
         }
 
-        // Firebase Setup
         const _0xHAF = atob("QUl6YVN5RFV4b19VbDY1VVlMTklrbEt0UmhaX1VuVVM5a29BUjBZ");
         const firebaseConfig = { databaseURL: "https://tracker-rastreador-haf-default-rtdb.firebaseio.com/" };
         firebase.initializeApp(firebaseConfig);
@@ -172,24 +153,31 @@
         let markers = {}; 
         let deviceData = {};
         let dispositivoSeleccionado = null;
-        let polylineHistorial = null;
-        let historialRef = null; 
-        let zIndexGlobal = 1000;
+        const paletaColores = ["#D32F2F", "#1976D2", "#FBC02D", "#5D4037", "#388E3C", "#E64A19"];
 
-        const paletaColores = ["#D32F2F", "#1976D2", "#FBC02D", "#5D4037", "#212121", "#455A64", "#388E3C", "#E64A19"];
+        function loadGoogleMaps() {
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${_0xHAF}&callback=initApp`;
+            document.head.appendChild(script);
+        }
 
-        (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?(console.warn(p+" only loads once. Re-queueing:",g),d[l](f,...n)):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({ key: _0xHAF, v: "weekly" });
-
-        async function initMap() {
-            const { Map, InfoWindow } = await google.maps.importLibrary("maps");
-            const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
-
-            map = new Map(document.getElementById("map"), {
-                zoom: 14, center: {lat: -32.889, lng: -68.845}, mapId: "4504f8b37365c3d0",
-                disableDefaultUI: true, zoomControl: true
+        window.initApp = function() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 14, center: {lat: -32.889, lng: -68.845},
+                disableDefaultUI: false, zoomControl: true, mapTypeId: 'roadmap'
             });
-            infoWindow = new InfoWindow();
+            infoWindow = new google.maps.InfoWindow();
+            startTracking();
+        };
 
+        function refreshUI() {
+            for (let id in markers) { markers[id].setMap(null); }
+            markers = {};
+            startTracking();
+            if (infoWindow) infoWindow.close();
+        }
+
+        function startTracking() {
             database.ref("dispositivos").on('value', (snapshot) => {
                 const listaDiv = document.getElementById("lista-dispositivos");
                 if (!listaDiv) return;
@@ -203,127 +191,119 @@
 
                     const data = fullVal.actual;
                     deviceData[id] = data;
-                    const pos = { lat: parseFloat(data.latitud), lng: parseFloat(data.longitud) };
+                    const pos = { lat: parseFloat(data.latitud || 0), lng: parseFloat(data.longitud || 0) };
                     let colorActual = paletaColores[indice % paletaColores.length];
 
                     if (!markers[id]) {
-                        const icon = document.createElement("div");
-                        icon.style.width = "0"; icon.style.height = "0";
-                        icon.style.borderLeft = "14px solid transparent";
-                        icon.style.borderRight = "14px solid transparent";
-                        icon.style.borderBottom = `30px solid ${colorActual}`;
-                        icon.style.filter = "drop-shadow(0 0 3px white)";
-                        
-                        markers[id] = new AdvancedMarkerElement({ 
-                            map: map, position: pos, content: icon, title: id, 
-                            zIndex: 1000 + indice, gmpClickable: true 
+                        markers[id] = new google.maps.Marker({ 
+                            map: map, position: pos, title: id,
+                            icon: {
+                                path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                                scale: 6, fillColor: colorActual, fillOpacity: 0.9,
+                                strokeColor: "#fff", strokeWeight: 2
+                            }
                         });
-                        markers[id].addEventListener("gmp-click", () => { abrirInfo(id); });
+                        markers[id].addListener("click", () => seleccionar(id));
                     } else {
-                        markers[id].position = pos;
+                        markers[id].setPosition(pos);
                     }
 
-                    const nombreLimpio = id.split("__")[0].replace(/_/g, " ");
+                    const nombreLimpio = String(id).split("__")[0].replace(/_/g, " ");
                     
                     let estadoRed = "🟢 Red Estable";
-                    let colorRed = "#0f0";
+                    let colorRed = "#008000";
                     if (data.hora) {
                         try {
                             const [h, m, s] = data.hora.split(":");
                             const hRep = new Date();
-                            hRep.setHours(h, m, s, 0);
-                            const df = (new Date() - hRep) / 1000;
-                            if (df > 60 || df < -60) {
-                                estadoRed = "🔴 Vehículo Sin Internet (Offline)";
-                                colorRed = "#f00";
+                            hRep.setHours(h, m, s || 0);
+                            if (Math.abs(new Date() - hRep) / 1000 > 60) {
+                                estadoRed = "🔴 Vehículo Sin Internet";
+                                colorRed = "#d00000";
                             }
                         } catch(e){}
                     }
 
-                    const estadoGps = data.status || "Esperando diagnóstico...";
+                    // PROTECCIÓN CONTRA UNDEFINED -> "SIN DATOS"
+                    const batDisplay = data.bateria || "SIN DATOS";
+                    const horaDisplay = data.hora || "SIN DATOS";
+                    const gpsDisplay = data.status || "SIN DATOS";
 
                     listaDiv.innerHTML += `
                         <div id="card-${id}" class="dispositivo-card ${dispositivoSeleccionado === id ? 'selected' : ''}" onclick="seleccionar('${id}')">
                             <b style="color:${colorActual}">${nombreLimpio}</b><br>
-                            🔋 ${data.bateria || "N/A"} | ⏰ ${data.hora || "--:--"}
-                            <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #333;">
-                                <small style="color:${colorRed}; display:block;">📶 ${estadoRed}</small>
-                                <small style="color:#aaa; display:block;">🛰️ ${estadoGps}</small>
+                            🔋 ${batDisplay}${batDisplay !== "SIN DATOS" ? "%" : ""} | ⏰ ${horaDisplay}
+                            <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #999;">
+                                <small style="color:${colorRed}; font-weight:bold; display:block;">📶 ${estadoRed}</small>
+                                <small style="color:#555; display:block;">🛰️ GPS: ${gpsDisplay}</small>
                             </div>
                         </div>`;
-                    
                     indice++;
                 });
             });
-        }
-
-        function abrirInfo(id) {
-            const data = deviceData[id];
-            if (!data) return;
-            const content = `<div style="color:#333; padding:10px; font-family:Arial; font-size:13px;">
-                <b style="color:#1A73E8; font-size:15px;">🛰️ ${id}</b><hr>
-                <b>🔋 Batería:</b> ${data.bateria || 'N/A'}<br>
-                <b>⏰ Reporte:</b> ${data.hora || '--:--'}<br>
-                <b>📡 GPS:</b> ${data.status || 'N/A'}
-            </div>`;
-            infoWindow.setContent(content);
-            infoWindow.open(map, markers[id]);
-            zIndexGlobal++; markers[id].zIndex = zIndexGlobal;
         }
 
         function seleccionar(id) {
             dispositivoSeleccionado = id;
             document.getElementById("nombre-sel").innerText = id;
             document.getElementById("seccion-historial").style.display = "block";
-            document.getElementById("panel").classList.remove("minimized");
+            
+            const data = deviceData[id];
             if(markers[id]) {
-                map.panTo(markers[id].position);
+                map.panTo(markers[id].getPosition());
                 map.setZoom(17);
-                abrirInfo(id);
+                
+                const bat = data.bateria || "SIN DATOS";
+                const status = data.status || "SIN DATOS";
+                
+                infoWindow.setContent(`<div style="color:#000"><b>${id}</b><br>Batería: ${bat}${bat !== "SIN DATOS" ? "%" : ""}<br>GPS: ${status}</div>`);
+                infoWindow.open(map, markers[id]);
             }
         }
 
+        let polylineHistorial = null;
+        let historialRef = null;
+
         async function verHistorial() {
             const fecha = document.getElementById("inputFecha").value;
-            if(!fecha || !dispositivoSeleccionado) return alert("Seleccioná una fecha");
+            if(!fecha || !dispositivoSeleccionado) return alert("Seleccioná una fecha y un dispositivo");
+            
             if(historialRef) historialRef.off();
             if(polylineHistorial) polylineHistorial.setMap(null);
             
-            polylineHistorial = new google.maps.Polyline({ path: [], map: map, strokeColor: '#F00', strokeWeight: 5 });
+            polylineHistorial = new google.maps.Polyline({
+                path: [], map: map, strokeColor: '#FF0000', strokeOpacity: 1.0, strokeWeight: 4,
+                icons: [{ icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW }, offset: '100%', repeat: '50px' }]
+            });
+
             historialRef = database.ref(`dispositivos/${dispositivoSeleccionado}/historial/${fecha}`);
             historialRef.on('value', snap => {
-                if(!snap.exists()) return alert("Sin datos");
+                if(!snap.exists()) return alert("No hay datos de historial.");
                 let puntos = [];
+                const bounds = new google.maps.LatLngBounds();
                 snap.forEach(h => { 
                     const p = h.val(); 
-                    if(p && p.latitud && p.longitud) puntos.push({lat: parseFloat(p.latitud), lng: parseFloat(p.longitud)});
+                    if(p && p.latitud && p.longitud) {
+                        const coord = {lat: parseFloat(p.latitud), lng: parseFloat(p.longitud)};
+                        puntos.push(coord);
+                        bounds.extend(coord);
+                    }
                 });
                 if(puntos.length > 0) {
                     polylineHistorial.setPath(puntos);
-                    const bounds = new google.maps.LatLngBounds();
-                    puntos.forEach(p => bounds.extend(p));
                     map.fitBounds(bounds);
                 }
             });
-            togglePanel();
         }
 
         function regresarAlVivo() {
             if(historialRef) { historialRef.off(); historialRef = null; }
-            document.getElementById("seccion-historial").style.display = "none";
             if (polylineHistorial) { polylineHistorial.setMap(null); polylineHistorial = null; }
+            document.getElementById("seccion-historial").style.display = "none";
             dispositivoSeleccionado = null;
-            if (infoWindow) infoWindow.close();
             map.setZoom(14);
-            document.getElementById("panel").classList.remove("minimized");
-        }
-
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('Service Worker Registrado'))
-                    .catch(err => console.error('Error al registrar SW', err));
-            });
+            map.panTo({lat: -32.889, lng: -68.845});
+            if (infoWindow) infoWindow.close();
         }
     </script>
 </body>
